@@ -1,0 +1,495 @@
+2025-06-29 06:49:12 - INFO - ========================================
+2025-06-29 06:49:12 - INFO - Namespace(model=' /data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='./checkpoints/model_stage1', devices=['cuda:0'])
+2025-06-29 06:49:12 - INFO - ========================================
+2025-06-29 06:51:50 - INFO - ========================================
+2025-06-29 06:51:50 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='./checkpoints/model_stage1', devices=['cuda:0'])
+2025-06-29 06:51:50 - INFO - ========================================
+2025-06-29 06:54:15 - INFO - ========================================
+2025-06-29 06:54:15 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 06:54:15 - INFO - ========================================
+2025-06-29 06:55:28 - INFO - ========================================
+2025-06-29 06:55:28 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 06:55:28 - INFO - ========================================
+2025-06-29 07:02:05 - INFO - ========================================
+2025-06-29 07:02:05 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 07:02:05 - INFO - ========================================
+2025-06-29 07:23:45 - INFO - ========================================
+2025-06-29 07:23:45 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 07:23:45 - INFO - ========================================
+2025-06-29 07:32:02 - INFO - ========================================
+2025-06-29 07:32:02 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 07:32:02 - INFO - ========================================
+2025-06-29 07:33:33 - INFO - ========================================
+2025-06-29 07:33:33 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 07:33:33 - INFO - ========================================
+2025-06-29 07:36:03 - INFO - ========================================
+2025-06-29 07:36:03 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 07:36:03 - INFO - ========================================
+2025-06-29 07:53:46 - INFO - ========================================
+2025-06-29 07:53:46 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 07:53:46 - INFO - ========================================
+2025-06-29 08:23:34 - INFO - ========================================
+2025-06-29 08:23:34 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:23:34 - INFO - ========================================
+2025-06-29 08:27:51 - INFO - ========================================
+2025-06-29 08:27:51 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:27:51 - INFO - ========================================
+2025-06-29 08:30:11 - INFO - ========================================
+2025-06-29 08:30:11 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:30:11 - INFO - ========================================
+2025-06-29 08:32:30 - INFO - ========================================
+2025-06-29 08:32:30 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:32:30 - INFO - ========================================
+2025-06-29 08:39:09 - INFO - ========================================
+2025-06-29 08:39:09 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:39:09 - INFO - ========================================
+2025-06-29 08:44:21 - INFO - ========================================
+2025-06-29 08:44:21 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:44:21 - INFO - ========================================
+2025-06-29 08:44:59 - INFO - ========================================
+2025-06-29 08:44:59 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:44:59 - INFO - ========================================
+2025-06-29 08:59:08 - INFO - ========================================
+2025-06-29 08:59:08 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 08:59:08 - INFO - ========================================
+2025-06-29 08:59:30 - WARNING - You shouldn't move a model that is dispatched using accelerate hooks.
+2025-06-29 09:04:52 - INFO - ========================================
+2025-06-29 09:04:52 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:04:52 - INFO - ========================================
+2025-06-29 09:09:54 - INFO - ========================================
+2025-06-29 09:09:54 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:09:54 - INFO - ========================================
+2025-06-29 09:12:35 - INFO - ========================================
+2025-06-29 09:12:35 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:12:35 - INFO - ========================================
+2025-06-29 09:13:03 - INFO - ========================================
+2025-06-29 09:13:03 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:13:03 - INFO - ========================================
+2025-06-29 09:15:42 - INFO - ========================================
+2025-06-29 09:15:42 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:15:42 - INFO - ========================================
+2025-06-29 09:18:03 - INFO - ========================================
+2025-06-29 09:18:03 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:18:03 - INFO - ========================================
+2025-06-29 09:20:10 - INFO - ========================================
+2025-06-29 09:20:10 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:20:10 - INFO - ========================================
+2025-06-29 09:21:32 - INFO - ========================================
+2025-06-29 09:21:32 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:21:32 - INFO - ========================================
+2025-06-29 09:22:12 - INFO - ========================================
+2025-06-29 09:22:12 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:22:12 - INFO - ========================================
+2025-06-29 09:24:28 - INFO - ========================================
+2025-06-29 09:24:28 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:24:28 - INFO - ========================================
+2025-06-29 09:37:01 - INFO - ========================================
+2025-06-29 09:37:01 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 09:37:01 - INFO - ========================================
+2025-06-29 10:42:47 - INFO - ========================================
+2025-06-29 10:42:47 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 10:42:47 - INFO - ========================================
+2025-06-29 10:44:57 - INFO - ========================================
+2025-06-29 10:44:57 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 10:44:57 - INFO - ========================================
+2025-06-29 10:48:53 - INFO - ========================================
+2025-06-29 10:48:53 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 10:48:53 - INFO - ========================================
+2025-06-29 10:59:44 - INFO - ========================================
+2025-06-29 10:59:44 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 10:59:44 - INFO - ========================================
+2025-06-29 11:00:41 - INFO - ========================================
+2025-06-29 11:00:41 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 11:00:41 - INFO - ========================================
+2025-06-29 11:02:50 - INFO - ========================================
+2025-06-29 11:02:50 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 11:02:50 - INFO - ========================================
+2025-06-29 11:04:40 - INFO - ========================================
+2025-06-29 11:04:40 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 11:04:40 - INFO - ========================================
+2025-06-29 11:21:15 - INFO - ========================================
+2025-06-29 11:21:15 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 11:21:15 - INFO - ========================================
+2025-06-29 11:32:20 - INFO - ========================================
+2025-06-29 11:32:20 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 11:32:20 - INFO - ========================================
+2025-06-29 11:38:05 - INFO - ========================================
+2025-06-29 11:38:05 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 11:38:05 - INFO - ========================================
+2025-06-29 11:39:24 - INFO - ========================================
+2025-06-29 11:39:24 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 11:39:24 - INFO - ========================================
+2025-06-29 13:56:52 - INFO - ========================================
+2025-06-29 13:56:52 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 13:56:52 - INFO - ========================================
+2025-06-29 14:04:21 - INFO - ========================================
+2025-06-29 14:04:21 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 14:04:21 - INFO - ========================================
+2025-06-29 15:50:10 - INFO - ========================================
+2025-06-29 15:50:10 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 15:50:10 - INFO - ========================================
+2025-06-29 15:51:06 - INFO - ========================================
+2025-06-29 15:51:06 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 15:51:06 - INFO - ========================================
+2025-06-29 15:56:23 - INFO - ========================================
+2025-06-29 15:56:23 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 15:56:23 - INFO - ========================================
+2025-06-29 16:20:29 - INFO - ========================================
+2025-06-29 16:20:29 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 16:20:29 - INFO - ========================================
+2025-06-29 16:21:34 - INFO - ========================================
+2025-06-29 16:21:34 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-29 16:21:34 - INFO - ========================================
+2025-06-30 03:14:58 - INFO - ========================================
+2025-06-30 03:14:58 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 03:14:58 - INFO - ========================================
+2025-06-30 03:16:45 - INFO - ========================================
+2025-06-30 03:16:45 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 03:16:45 - INFO - ========================================
+2025-06-30 03:18:00 - INFO - ========================================
+2025-06-30 03:18:00 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 03:18:00 - INFO - ========================================
+2025-06-30 03:18:37 - INFO - ========================================
+2025-06-30 03:18:37 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 03:18:37 - INFO - ========================================
+2025-06-30 07:13:27 - INFO - ========================================
+2025-06-30 07:13:27 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 07:13:27 - INFO - ========================================
+2025-06-30 07:27:24 - INFO - ========================================
+2025-06-30 07:27:24 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 07:27:24 - INFO - ========================================
+2025-06-30 07:28:12 - INFO - ========================================
+2025-06-30 07:28:12 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 07:28:12 - INFO - ========================================
+2025-06-30 07:30:31 - INFO - ========================================
+2025-06-30 07:30:31 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 07:30:31 - INFO - ========================================
+2025-06-30 07:38:40 - INFO - ========================================
+2025-06-30 07:38:40 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 07:38:40 - INFO - ========================================
+2025-06-30 07:51:07 - INFO - ========================================
+2025-06-30 07:51:07 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 07:51:07 - INFO - ========================================
+2025-06-30 07:55:00 - INFO - ========================================
+2025-06-30 07:55:00 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 07:55:00 - INFO - ========================================
+2025-06-30 09:36:49 - INFO - ========================================
+2025-06-30 09:36:49 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-06-30 09:36:49 - INFO - ========================================
+2025-07-05 02:10:17 - INFO - ========================================
+2025-07-05 02:10:17 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-05 02:10:17 - INFO - ========================================
+2025-07-05 02:12:10 - INFO - ========================================
+2025-07-05 02:12:10 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-05 02:12:10 - INFO - ========================================
+2025-07-05 02:17:48 - INFO - ========================================
+2025-07-05 02:17:48 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-05 02:17:48 - INFO - ========================================
+2025-07-05 02:29:56 - INFO - ========================================
+2025-07-05 02:29:56 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-05 02:29:56 - INFO - ========================================
+2025-07-05 02:44:21 - INFO - ========================================
+2025-07-05 02:44:21 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-05 02:44:21 - INFO - ========================================
+2025-07-05 03:04:42 - INFO - ========================================
+2025-07-05 03:04:42 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-05 03:04:42 - INFO - ========================================
+2025-07-05 03:04:47 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-05 03:05:28 - INFO - ========================================
+2025-07-05 03:05:28 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=10, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-05 03:05:28 - INFO - ========================================
+2025-07-12 06:44:54 - INFO - ========================================
+2025-07-12 06:44:54 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 06:44:54 - INFO - ========================================
+2025-07-12 07:07:11 - INFO - ========================================
+2025-07-12 07:07:11 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 07:07:11 - INFO - ========================================
+2025-07-12 07:47:26 - INFO - ========================================
+2025-07-12 07:47:26 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 07:47:26 - INFO - ========================================
+2025-07-12 08:21:40 - INFO - ========================================
+2025-07-12 08:21:40 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:21:40 - INFO - ========================================
+2025-07-12 08:23:40 - INFO - ========================================
+2025-07-12 08:23:40 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:23:40 - INFO - ========================================
+2025-07-12 08:25:04 - INFO - ========================================
+2025-07-12 08:25:04 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:25:04 - INFO - ========================================
+2025-07-12 08:25:08 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 08:29:11 - INFO - ========================================
+2025-07-12 08:29:11 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:29:11 - INFO - ========================================
+2025-07-12 08:29:14 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 08:34:05 - INFO - ========================================
+2025-07-12 08:34:05 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:34:05 - INFO - ========================================
+2025-07-12 08:34:08 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 08:37:32 - INFO - ========================================
+2025-07-12 08:37:32 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:37:32 - INFO - ========================================
+2025-07-12 08:37:35 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 08:39:56 - INFO - ========================================
+2025-07-12 08:39:56 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:39:56 - INFO - ========================================
+2025-07-12 08:40:00 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 08:42:00 - INFO - ========================================
+2025-07-12 08:42:00 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 08:42:00 - INFO - ========================================
+2025-07-12 08:42:04 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 11:03:01 - INFO - ========================================
+2025-07-12 11:03:01 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 11:03:01 - INFO - ========================================
+2025-07-12 11:03:05 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 11:09:47 - INFO - ========================================
+2025-07-12 11:09:47 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 11:09:47 - INFO - ========================================
+2025-07-12 11:09:51 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 11:13:14 - INFO - ========================================
+2025-07-12 11:13:14 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'])
+2025-07-12 11:13:14 - INFO - ========================================
+2025-07-12 11:13:18 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 12:06:17 - INFO - ========================================
+2025-07-12 12:06:17 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 12:06:17 - INFO - ========================================
+2025-07-12 12:06:22 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 12:59:35 - INFO - ========================================
+2025-07-12 12:59:35 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 12:59:35 - INFO - ========================================
+2025-07-12 12:59:40 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:01:27 - INFO - ========================================
+2025-07-12 13:01:27 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:01:27 - INFO - ========================================
+2025-07-12 13:01:32 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:03:57 - INFO - ========================================
+2025-07-12 13:03:57 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:03:57 - INFO - ========================================
+2025-07-12 13:04:03 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:06:26 - INFO - ========================================
+2025-07-12 13:06:26 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:06:26 - INFO - ========================================
+2025-07-12 13:06:30 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:10:52 - INFO - ========================================
+2025-07-12 13:10:52 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:10:52 - INFO - ========================================
+2025-07-12 13:10:57 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:13:18 - INFO - ========================================
+2025-07-12 13:13:18 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:13:18 - INFO - ========================================
+2025-07-12 13:13:23 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:15:06 - INFO - ========================================
+2025-07-12 13:15:06 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:15:06 - INFO - ========================================
+2025-07-12 13:15:11 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:20:17 - INFO - ========================================
+2025-07-12 13:20:17 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:20:17 - INFO - ========================================
+2025-07-12 13:20:22 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:26:13 - INFO - ========================================
+2025-07-12 13:26:13 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:26:13 - INFO - ========================================
+2025-07-12 13:26:18 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:26:48 - INFO - ========================================
+2025-07-12 13:26:48 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:26:48 - INFO - ========================================
+2025-07-12 13:26:53 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:44:22 - INFO - ========================================
+2025-07-12 13:44:22 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:44:22 - INFO - ========================================
+2025-07-12 13:44:27 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-12 13:49:08 - INFO - ========================================
+2025-07-12 13:49:08 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-12 13:49:08 - INFO - ========================================
+2025-07-12 13:49:12 - WARNING - Some parameters are on the meta device because they were offloaded to the cpu.
+2025-07-13 02:37:23 - INFO - ========================================
+2025-07-13 02:37:23 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 02:37:23 - INFO - ========================================
+2025-07-13 02:50:37 - INFO - ========================================
+2025-07-13 02:50:37 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 02:50:37 - INFO - ========================================
+2025-07-13 02:53:02 - INFO - ========================================
+2025-07-13 02:53:02 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 02:53:02 - INFO - ========================================
+2025-07-13 02:58:11 - INFO - ========================================
+2025-07-13 02:58:11 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 02:58:11 - INFO - ========================================
+2025-07-13 02:59:08 - INFO - ========================================
+2025-07-13 02:59:08 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='stage1', task='vsp-spatial-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./data/sample.jsonl', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 02:59:08 - INFO - ========================================
+2025-07-13 06:07:49 - INFO - ========================================
+2025-07-13 06:07:49 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:07:49 - INFO - ========================================
+2025-07-13 06:10:21 - INFO - ========================================
+2025-07-13 06:10:21 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:10:21 - INFO - ========================================
+2025-07-13 06:18:04 - INFO - ========================================
+2025-07-13 06:18:04 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:18:04 - INFO - ========================================
+2025-07-13 06:20:04 - INFO - ========================================
+2025-07-13 06:20:04 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:20:04 - INFO - ========================================
+2025-07-13 06:24:39 - INFO - ========================================
+2025-07-13 06:24:39 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:24:39 - INFO - ========================================
+2025-07-13 06:25:28 - INFO - ========================================
+2025-07-13 06:25:28 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:25:28 - INFO - ========================================
+2025-07-13 06:27:05 - INFO - ========================================
+2025-07-13 06:27:05 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:27:05 - INFO - ========================================
+2025-07-13 06:31:53 - INFO - ========================================
+2025-07-13 06:31:53 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:31:53 - INFO - ========================================
+2025-07-13 06:35:16 - INFO - ========================================
+2025-07-13 06:35:16 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:35:16 - INFO - ========================================
+2025-07-13 06:37:09 - INFO - ========================================
+2025-07-13 06:37:09 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 06:37:09 - INFO - ========================================
+2025-07-13 08:40:41 - INFO - ========================================
+2025-07-13 08:40:41 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 08:40:41 - INFO - ========================================
+2025-07-13 09:20:31 - INFO - ========================================
+2025-07-13 09:20:31 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 09:20:31 - INFO - ========================================
+2025-07-13 09:22:38 - INFO - ========================================
+2025-07-13 09:22:38 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 09:22:38 - INFO - ========================================
+2025-07-13 13:15:07 - INFO - ========================================
+2025-07-13 13:15:07 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 13:15:07 - INFO - ========================================
+2025-07-13 13:35:57 - INFO - ========================================
+2025-07-13 13:35:57 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 13:35:57 - INFO - ========================================
+2025-07-13 13:40:01 - INFO - ========================================
+2025-07-13 13:40:01 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 13:40:01 - INFO - ========================================
+2025-07-13 13:42:56 - INFO - ========================================
+2025-07-13 13:42:56 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 13:42:56 - INFO - ========================================
+2025-07-13 13:44:44 - INFO - ========================================
+2025-07-13 13:44:44 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 13:44:44 - INFO - ========================================
+2025-07-13 13:52:32 - INFO - ========================================
+2025-07-13 13:52:32 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 13:52:32 - INFO - ========================================
+2025-07-13 13:58:43 - INFO - ========================================
+2025-07-13 13:58:43 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 13:58:43 - INFO - ========================================
+2025-07-13 14:10:50 - INFO - ========================================
+2025-07-13 14:10:50 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:10:50 - INFO - ========================================
+2025-07-13 14:28:18 - INFO - ========================================
+2025-07-13 14:28:18 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:28:18 - INFO - ========================================
+2025-07-13 14:31:30 - INFO - ========================================
+2025-07-13 14:31:30 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:31:30 - INFO - ========================================
+2025-07-13 14:36:37 - INFO - ========================================
+2025-07-13 14:36:37 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:36:37 - INFO - ========================================
+2025-07-13 14:40:35 - INFO - ========================================
+2025-07-13 14:40:35 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:40:35 - INFO - ========================================
+2025-07-13 14:47:16 - INFO - ========================================
+2025-07-13 14:47:16 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:47:16 - INFO - ========================================
+2025-07-13 14:48:26 - INFO - ========================================
+2025-07-13 14:48:26 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:48:26 - INFO - ========================================
+2025-07-13 14:56:42 - INFO - ========================================
+2025-07-13 14:56:42 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 14:56:42 - INFO - ========================================
+2025-07-13 18:03:08 - INFO - ========================================
+2025-07-13 18:03:08 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 18:03:08 - INFO - ========================================
+2025-07-13 19:58:24 - INFO - ========================================
+2025-07-13 19:58:24 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 19:58:24 - INFO - ========================================
+2025-07-13 19:59:51 - INFO - ========================================
+2025-07-13 19:59:51 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 19:59:51 - INFO - ========================================
+2025-07-13 20:02:50 - INFO - ========================================
+2025-07-13 20:02:50 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-13 20:02:50 - INFO - ========================================
+2025-07-14 03:11:48 - INFO - ========================================
+2025-07-14 03:11:48 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:11:48 - INFO - ========================================
+2025-07-14 03:17:20 - INFO - ========================================
+2025-07-14 03:17:20 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:17:20 - INFO - ========================================
+2025-07-14 03:18:56 - INFO - ========================================
+2025-07-14 03:18:56 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:18:56 - INFO - ========================================
+2025-07-14 03:20:50 - INFO - ========================================
+2025-07-14 03:20:50 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:20:50 - INFO - ========================================
+2025-07-14 03:26:14 - INFO - ========================================
+2025-07-14 03:26:14 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:26:14 - INFO - ========================================
+2025-07-14 03:28:31 - INFO - ========================================
+2025-07-14 03:28:31 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:28:31 - INFO - ========================================
+2025-07-14 03:37:26 - INFO - ========================================
+2025-07-14 03:37:26 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:37:26 - INFO - ========================================
+2025-07-14 03:39:19 - INFO - ========================================
+2025-07-14 03:39:19 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:39:19 - INFO - ========================================
+2025-07-14 03:41:31 - INFO - ========================================
+2025-07-14 03:41:31 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:41:31 - INFO - ========================================
+2025-07-14 03:45:46 - INFO - ========================================
+2025-07-14 03:45:46 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:45:46 - INFO - ========================================
+2025-07-14 03:50:54 - INFO - ========================================
+2025-07-14 03:50:54 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:50:54 - INFO - ========================================
+2025-07-14 03:55:06 - INFO - ========================================
+2025-07-14 03:55:06 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 03:55:06 - INFO - ========================================
+2025-07-14 04:07:43 - INFO - ========================================
+2025-07-14 04:07:43 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 04:07:43 - INFO - ========================================
+2025-07-14 04:11:56 - INFO - ========================================
+2025-07-14 04:11:56 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 04:11:56 - INFO - ========================================
+2025-07-14 04:15:34 - INFO - ========================================
+2025-07-14 04:15:34 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 04:15:34 - INFO - ========================================
+2025-07-14 05:28:58 - INFO - ========================================
+2025-07-14 05:28:58 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 05:28:58 - INFO - ========================================
+2025-07-14 05:41:22 - INFO - ========================================
+2025-07-14 05:41:22 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 05:41:22 - INFO - ========================================
+2025-07-14 05:49:12 - INFO - ========================================
+2025-07-14 05:49:12 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 05:49:12 - INFO - ========================================
+2025-07-14 05:56:31 - INFO - ========================================
+2025-07-14 05:56:31 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 05:56:31 - INFO - ========================================
+2025-07-14 06:04:26 - INFO - ========================================
+2025-07-14 06:04:26 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 06:04:26 - INFO - ========================================
+2025-07-14 06:23:24 - INFO - ========================================
+2025-07-14 06:23:24 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False)
+2025-07-14 06:23:24 - INFO - ========================================
+2025-07-20 08:52:51 - INFO - ========================================
+2025-07-20 08:52:51 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False, alignment='colon')
+2025-07-20 08:52:51 - INFO - ========================================
+2025-07-20 13:04:11 - INFO - ========================================
+2025-07-20 13:04:11 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False, alignment='colon')
+2025-07-20 13:04:11 - INFO - ========================================
+2025-07-20 13:04:52 - INFO - ========================================
+2025-07-20 13:04:52 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False, alignment='colon')
+2025-07-20 13:04:52 - INFO - ========================================
+2025-07-20 13:11:08 - INFO - ========================================
+2025-07-20 13:11:08 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False, alignment='colon')
+2025-07-20 13:11:08 - INFO - ========================================
+2025-07-20 13:15:20 - INFO - ========================================
+2025-07-20 13:15:20 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False, alignment='colon')
+2025-07-20 13:15:20 - INFO - ========================================
+2025-07-20 13:17:07 - INFO - ========================================
+2025-07-20 13:17:07 - INFO - Namespace(model='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', stage='avt_stage1', task='mm-reasoning', latent_size=4, compress_strategy='average', epochs=1, data_path='./new/created_dataset/filtered_data/CoF/filtered_train.json', log_file='./log.txt', save_model_path='./checkpoints/model_stage1', load_model_path='/data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct', devices=['cuda:0'], add_reflection=False, alignment='observation_end')
+2025-07-20 13:17:07 - INFO - ========================================

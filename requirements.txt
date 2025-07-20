@@ -1,0 +1,7 @@
+torch
+datasets
+trl==0.15.2
+qwen_vl_utils
+mathruler
+pylatexenc
+Pillow
