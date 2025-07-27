@@ -14,8 +14,6 @@ python -m data_utils.stage1 \
 
 # stage 2
 export NCCL_P2P_DISABLE=1
-export RAY_CGRAPH_get_timeout=350
-export RAY_CGRAPH_submit_timeout=350
 conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage2 \
