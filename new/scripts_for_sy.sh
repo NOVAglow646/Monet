@@ -1,7 +1,7 @@
 # Zebra_CoT geometry
 # stage 1
 export NCCL_P2P_DISABLE=1
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage1 \
   --dataset-name Zebra_CoT_geometry \
@@ -16,7 +16,7 @@ python -m data_utils.stage1 \
 export NCCL_P2P_DISABLE=1
 export RAY_CGRAPH_get_timeout=350
 export RAY_CGRAPH_submit_timeout=350
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage2 \
   --stage1 ./created_dataset/filtered_data/Zebra_CoT_geometry/stage1_policy_out.jsonl \
@@ -31,7 +31,7 @@ python -m data_utils.stage2 \
   #--max-samples 200 
 
 # stage 3
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage3 \
   --stage2 ./created_dataset/filtered_data/Zebra_CoT_geometry/stage2_strong_out.jsonl \
@@ -44,7 +44,7 @@ python -m data_utils.stage3 \
 # Zebra_CoT physics
 # stage 1
 export NCCL_P2P_DISABLE=1
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage1 \
   --dataset-name Zebra_CoT_physics \
@@ -57,7 +57,7 @@ python -m data_utils.stage1 \
 
 # stage 2
 export NCCL_P2P_DISABLE=1
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage2 \
   --stage1 ./created_dataset/filtered_data/Zebra_CoT_physics/stage1_policy_out.jsonl \
@@ -72,7 +72,7 @@ python -m data_utils.stage2 \
   #--max-samples 200 
 
 # stage 3
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage3 \
   --stage2 ./created_dataset/filtered_data/Zebra_CoT_physics/stage2_strong_out.jsonl \
@@ -85,7 +85,7 @@ python -m data_utils.stage3 \
 # Zebra_CoT maze
 # stage 1
 export NCCL_P2P_DISABLE=1
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage1 \
   --dataset-name Zebra_CoT_maze \
@@ -98,7 +98,7 @@ python -m data_utils.stage1 \
 
 # stage 2
 export NCCL_P2P_DISABLE=1
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage2 \
   --stage1 ./created_dataset/filtered_data/Zebra_CoT_maze/stage1_policy_out.jsonl \
@@ -113,7 +113,7 @@ python -m data_utils.stage2 \
   #--max-samples 200 
 
 # stage 3
-conda activate easyr1
+conda activate mirage
 cd path_to_your_code/Mirage/new
 python -m data_utils.stage3 \
   --stage2 ./created_dataset/filtered_data/Zebra_CoT_maze/stage2_strong_out.jsonl \
