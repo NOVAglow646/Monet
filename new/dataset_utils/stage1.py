@@ -871,6 +871,9 @@ def main():
     parser.add_argument("--limit", type=int, default=-1,
                         help="最多处理多少条；-1 表示全部")
     parser.add_argument("--judge_llm_dir", type=str, default=None)
+    parser.add_argument("--judge_llm_tensor_parallel_size", type=int, default=2)
+    parser.add_argument("--policy_mllm_tensor_parallel_size", type=int, default=2,
+                        help="policy_mllm 模型的 tensor parallel size")
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
@@ -895,7 +898,7 @@ def main():
 
     # 加载 policy 模型
     print("[Init policy_mllm]")
-    policy_mllm, sampling_params = vllm_mllm_init(args.policy_model_path, tp=2)
+    policy_mllm, sampling_params = vllm_mllm_init(args.policy_model_path, tp=args.policy_mllm_tensor_parallel_size)
 
     # ------------------ 加载原始数据 ------------------
     print(f"[Load dataset] {args.dataset_name} -> {dataset_path}")
@@ -981,7 +984,7 @@ def main():
 
     # use batch_judge
     if args.judge_llm_dir is not None:
-        judge_llm, _ = vllm_llm_init(args.judge_llm_dir, tp=2)
+        judge_llm, _ = vllm_llm_init(args.judge_llm_dir, tp=args.judge_llm_tensor_parallel_size)
         judged = llm_batch_judge(extr_outs, gts, judge_llm, questions=questions if len(questions) > 0 else None)
     else:
         #judged = batch_judge(extr_outs, gts, choices_list, llm=judge_llm, questions=questions if len(questions)>0 else None)

@@ -279,7 +279,7 @@ def run_batch_step(
     if judge_preds:
         try:
             if judge_llm_dir is not None:
-                judge_llm, _ = vllm_llm_init(judge_llm_dir, tp=2)
+                judge_llm, _ = vllm_llm_init(judge_llm_dir, tp=args.judge_llm_tensor_parallel_size)
                 flags = llm_batch_judge(judge_preds, judge_gt, judge_llm, questions)
             else:
                 #flags = batch_judge(judge_preds, judge_gt, judge_choices, questions=questions if len(questions)>0 else None, llm=judge_llm)
@@ -329,6 +329,8 @@ def main():
     ap.add_argument("--max-samples", type=int, default=None, help="调试：限制样本数")
     ap.add_argument("--leak-log", type=str, default=None, help="保存被剔除样本 JSONL (可选)")
     ap.add_argument("--judge_llm_dir", type=str, default=None)
+    ap.add_argument("--strong_mllm_tensor_parallel_size", type=int, default=4, help="strong_mllm 模型张量并行度")
+    ap.add_argument("--judge_llm_tensor_parallel_size", type=int, default=2, help="judge_llm 模型张量并行度")
     args = ap.parse_args()
 
     devs = parse_devices(args.devices)
@@ -336,7 +338,7 @@ def main():
 
     # 模型（tp=GPU数）
     print(f"[Stage2] loading strong_mllm: {args.model_path}")
-    model, sampling_params = vllm_mllm_init(args.model_path, tp=4)
+    model, sampling_params = vllm_mllm_init(args.model_path, tp=args.strong_mllm_tensor_parallel_size)
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     processor = AutoProcessor.from_pretrained(args.model_path)
 
