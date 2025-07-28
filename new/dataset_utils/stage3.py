@@ -31,7 +31,7 @@ from AAA_vllm_toolkit.load_and_gen_vllm import (
     vllm_generate,
 )
 from AAA_vllm_toolkit.deepseek_api import build_ds_client, get_ds_response
-from data_utils.prompts import *
+from dataset_utils.prompts import *
 
 # ---------------------------------------------------------------------------
 # IO helpers
@@ -110,12 +110,12 @@ def batch_align_concat(dataset_name: str, full_texts: List[str], llm, sampling_p
         chunk = full_texts[i:i+batch_size]
         prompts = build_align_prompts(chunk)
         if llm is not None:
-            inputs = vllm_llm_process_batch_data(sys_prompt=ALIGN_SYS_PROMPT_LAST_STRONG+examples_pool[dataset_name], usr_prompts=prompts, tokenizer=tokenizer)
+            inputs = vllm_llm_process_batch_data(sys_prompt=examples_pool[dataset_name]["sys_prompt"]+examples_pool[dataset_name]["examples"], usr_prompts=prompts, tokenizer=tokenizer)
             outs = vllm_generate(inputs, sampling_params, llm)
             for o in outs:
                 out_texts.append(o.outputs[0].text.strip() if o.outputs else "")
         elif ds_client is not None:
-            responses = get_ds_response(ds_client, ALIGN_SYS_PROMPT_LAST_STRONG+examples_pool[dataset_name], prompts, temperature=0.3)
+            responses = get_ds_response(ds_client, examples_pool[dataset_name]["sys_prompt"]+examples_pool[dataset_name]["examples"], prompts, temperature=0.3)
             for response in responses:
                 out_texts.append(response.strip())
         else:
