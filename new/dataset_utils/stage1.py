@@ -56,7 +56,7 @@ from AAA_vllm_toolkit.load_and_gen_vllm import (
     vllm_llm_init,
     vllm_mllm_process_batch_from_messages,
     count_qwen_vl_tokens,
-    vllm_kill_model
+    vllm_kill_model,
 )
 from AAA_vllm_toolkit.extract_and_check import (
     extract_boxed_answer,
@@ -113,32 +113,33 @@ DEFAULT_DATASETS = {
         "dataset_images_root": "",
     },
     "Zebra_CoT_geometry": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/Zebra-CoT/Scientific Reasoning - Geometry",
+        "dataset_path": "/ytech_m2v5_hdd/workspace/kling_mm/Datasets/Zebra-CoT/Scientific Reasoning - Geometry",
         "dataset_images_root": "",
     },
     "Zebra_CoT_physics": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/Zebra-CoT/Scientific Reasoning - Physics",
+        "dataset_path": "/ytech_m2v5_hdd/workspace/kling_mm/Datasets/Zebra-CoT/Scientific Reasoning - Physics",
         "dataset_images_root": "",
     },
     "Zebra_CoT_maze": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/Zebra-CoT/Visual Logic & Strategic Games - Maze",
+        "dataset_path": "/ytech_m2v5_hdd/workspace/kling_mm/Datasets/Zebra-CoT/Visual Logic & Strategic Games - Maze",
         "dataset_images_root": "",
-    }
+    },
 }
-
 
 
 def _ensure_rgb(img: Image.Image) -> Image.Image:
     return img.convert("RGB") if img.mode != "RGB" else img
 
 
-def draw_bboxes(img: Image.Image,
-                bboxes: List[List[int]],
-                labels: Optional[List[str]] = None,
-                colors: Optional[List[str]] = None,
-                line_width: int = 3,
-                font_path: Optional[str] = None,
-                font_size: int = 16) -> Image.Image:
+def draw_bboxes(
+    img: Image.Image,
+    bboxes: List[List[int]],
+    labels: Optional[List[str]] = None,
+    colors: Optional[List[str]] = None,
+    line_width: int = 3,
+    font_path: Optional[str] = None,
+    font_size: int = 16,
+) -> Image.Image:
     img = _ensure_rgb(img.copy())
     draw = ImageDraw.Draw(img)
     default_palette = ["red", "lime", "blue", "yellow", "cyan", "magenta", "orange"]
@@ -164,28 +165,44 @@ def draw_bboxes(img: Image.Image,
             draw.text((xmin + 3, ymin - h - 2), text, fill="black", font=font)
     return img
 
+
 def valid_bbox(bbox: Union[List[int], Tuple[int, int, int, int]]) -> bool:
     if isinstance(bbox, (list, tuple)) and len(bbox) == 4:
-        if not isinstance(bbox[0], int) or not isinstance(bbox[1], int) or not isinstance(bbox[2], int) or not isinstance(bbox[3], int):
+        if (
+            not isinstance(bbox[0], int)
+            or not isinstance(bbox[1], int)
+            or not isinstance(bbox[2], int)
+            or not isinstance(bbox[3], int)
+        ):
             return False
         xmin, ymin, xmax, ymax = bbox
         return xmin < xmax and ymin < ymax
     return False
 
-def draw_line(img: Image.Image,
-              pt1: Tuple[int, int],
-              pt2: Tuple[int, int],
-              color: str = "red",
-              width: int = 3) -> Image.Image:
+
+def draw_line(
+    img: Image.Image,
+    pt1: Tuple[int, int],
+    pt2: Tuple[int, int],
+    color: str = "red",
+    width: int = 3,
+) -> Image.Image:
     img = _ensure_rgb(img.copy())
     draw = ImageDraw.Draw(img)
     draw.line([pt1, pt2], fill=color, width=width)
     return img
 
+
 def valid_line_pt(pt: Tuple[int, int, int, int]) -> bool:
-    if not isinstance(pt[0], int) or not isinstance(pt[1], int) or not isinstance(pt[2], int) or not isinstance(pt[3], int):
+    if (
+        not isinstance(pt[0], int)
+        or not isinstance(pt[1], int)
+        or not isinstance(pt[2], int)
+        or not isinstance(pt[3], int)
+    ):
         return False
     return pt[2] > pt[0] and pt[3] > pt[1] and pt[0] >= 0 and pt[1] >= 0
+
 
 def valid_img_size(img: Optional[Image.Image]) -> bool:
     if img is None:
@@ -210,20 +227,24 @@ def choice2str(gt_choices: Optional[List[str]], letter: str) -> str:
     return letter
 
 
-def add_boxed_instruction(question: str, allow_None = True, mode="normal") -> str:
+def add_boxed_instruction(question: str, allow_None=True, mode="normal") -> str:
     if mode == "multi_choice":
         boxed_instruction = "Put the letter of your choice within \\boxed{}."
     elif mode == "normal":
         boxed_instruction = "Put your final answer within \\boxed{}."
     elif mode == "single_word":
-        boxed_instruction = "Given the answer in a single word and put it within \\boxed{}."
-    
+        boxed_instruction = (
+            "Given the answer in a single word and put it within \\boxed{}."
+        )
+
     if allow_None:
-        return question + f"\n{boxed_instruction}" + " If you cannot see relevant visual information to infer the answer from the image, just output \\boxed{None} and don't guess the answer based on your knowledge."
+        return (
+            question
+            + f"\n{boxed_instruction}"
+            + " If you cannot see relevant visual information to infer the answer from the image, just output \\boxed{None} and don't guess the answer based on your knowledge."
+        )
     else:
         return question + f"\n{boxed_instruction}"
-
-
 
 
 # ============================================================
@@ -242,7 +263,9 @@ def add_boxed_instruction(question: str, allow_None = True, mode="normal") -> st
 # ============================================================
 
 
-def parse_pixelreasoner(sample: Dict[str, Any], dataset_images_root: Path) -> Optional[Dict[str, Any]]:
+def parse_pixelreasoner(
+    sample: Dict[str, Any], dataset_images_root: Path
+) -> Optional[Dict[str, Any]]:
     # ---------------- question / choices ----------------
     raw_q = sample["question"]
 
@@ -313,20 +336,24 @@ def parse_pixelreasoner(sample: Dict[str, Any], dataset_images_root: Path) -> Op
             helper_img = main_img.crop((x0, y0, x1, y1))
             if not valid_img_size(helper_img):
                 return None
-            helpers.append({
-                "step_idx": i,
-                "text": step_text,
-                "image": helper_img,
-                "type": "crop",
-            })
+            helpers.append(
+                {
+                    "step_idx": i,
+                    "text": step_text,
+                    "image": helper_img,
+                    "type": "crop",
+                }
+            )
         else:
             # text-only step? 仅在需要还原 COT 时保留
-            helpers.append({
-                "step_idx": i,
-                "text": step_text,
-                "image": None,
-                "type": "text",
-            })
+            helpers.append(
+                {
+                    "step_idx": i,
+                    "text": step_text,
+                    "image": None,
+                    "type": "text",
+                }
+            )
 
     gt_answer_text = None
     if gt_letter is not None:
@@ -342,7 +369,9 @@ def parse_pixelreasoner(sample: Dict[str, Any], dataset_images_root: Path) -> Op
     }
 
 
-def parse_com(sample: Dict[str, Any], dataset_images_root: Path, w_mathvista: bool = True) -> Optional[Dict[str, Any]]:
+def parse_com(
+    sample: Dict[str, Any], dataset_images_root: Path, w_mathvista: bool = True
+) -> Optional[Dict[str, Any]]:
     raw_q = sample["question"]
 
     def _remove_choices(question: str) -> str:
@@ -367,7 +396,7 @@ def parse_com(sample: Dict[str, Any], dataset_images_root: Path, w_mathvista: bo
     question = add_boxed_instruction(_remove_choices(raw_q))
     if not w_mathvista:
         if "MathVista" in sample["image"]:
-            return None 
+            return None
     img_path = dataset_images_root / sample["image"]
     if not img_path.is_file():
         print(f"[CoM] missing image: {img_path}")
@@ -377,7 +406,9 @@ def parse_com(sample: Dict[str, Any], dataset_images_root: Path, w_mathvista: bo
     gt_raw = sample.get("answer")
     gt_answer_text = None
     if gt_raw is not None:
-        gt_answer_text = choice2str(gt_choices, str(gt_raw)) if gt_choices else str(gt_raw)
+        gt_answer_text = (
+            choice2str(gt_choices, str(gt_raw)) if gt_choices else str(gt_raw)
+        )
 
     steps = sample.get("response_steps", [])
     helpers = []
@@ -426,12 +457,14 @@ def parse_com(sample: Dict[str, Any], dataset_images_root: Path, w_mathvista: bo
         if helper_img is not None and not valid_img_size(helper_img):
             helper_img = None
             typ = "text"
-        helpers.append({
-            "step_idx": i,
-            "text": resp_str,
-            "image": helper_img,
-            "type": typ,
-        })
+        helpers.append(
+            {
+                "step_idx": i,
+                "text": resp_str,
+                "image": helper_img,
+                "type": typ,
+            }
+        )
 
     return {
         "qid": sample.get("qid"),
@@ -443,7 +476,9 @@ def parse_com(sample: Dict[str, Any], dataset_images_root: Path, w_mathvista: bo
     }
 
 
-def parse_cof(sample: Dict[str, Any], dataset_images_root: Path) -> Optional[Dict[str, Any]]:
+def parse_cof(
+    sample: Dict[str, Any], dataset_images_root: Path
+) -> Optional[Dict[str, Any]]:
     # CoF 样本结构：{"images": [...], "messages": [...]}
     images_rel = sample.get("images", [])
     if len(images_rel) < 2:
@@ -482,14 +517,19 @@ def parse_cof(sample: Dict[str, Any], dataset_images_root: Path) -> Optional[Dic
         if not matches:
             return None
         return [m.strip() for m in matches]
-    
+
     def _get_bbox_and_rmv_tool(text: str):
-        text = text.replace("<think> ", "").replace("</think>", "").replace("<answer>", "\\boxed{").replace("</answer>", "}")
+        text = (
+            text.replace("<think> ", "")
+            .replace("</think>", "")
+            .replace("<answer>", "\\boxed{")
+            .replace("</answer>", "}")
+        )
         s = text.find("<tool_call>")
         e = text.find("</tool_call>")
         if s == -1 or e == -1:
             return None, text
-        tool_call_str = text[s+len("<tool_call>"):e]
+        tool_call_str = text[s + len("<tool_call>") : e]
         bbox = json.loads(tool_call_str)["arguments"]["bbox_2d"]
         return bbox, text[:s] + "<abs_vis_token></abs_vis_token>"
 
@@ -513,18 +553,22 @@ def parse_cof(sample: Dict[str, Any], dataset_images_root: Path) -> Optional[Dic
         bbox, resp_wo_tool = _get_bbox_and_rmv_tool(step["content"])
         if bbox is not None:
             typ = "crop"
-            helper_img = Image.open(dataset_images_root / "images" / images_rel[img_id]).convert("RGB")
+            helper_img = Image.open(
+                dataset_images_root / "images" / images_rel[img_id]
+            ).convert("RGB")
             if not valid_img_size(helper_img):
                 print(f"Invalid image size for helper image, return None")
                 return None
             img_id += 1
 
-        helpers.append({
-            "step_idx": step_id,
-            "text": resp_wo_tool,
-            "image": helper_img,
-            "type": typ,
-        })
+        helpers.append(
+            {
+                "step_idx": step_id,
+                "text": resp_wo_tool,
+                "image": helper_img,
+                "type": typ,
+            }
+        )
         step_id += 1
 
     gt_answer_text = None
@@ -547,44 +591,61 @@ def parse_cof(sample: Dict[str, Any], dataset_images_root: Path) -> Optional[Dic
     }
 
 
-def parse_refocus(sample: Dict[str, Any], dataset_images_root: Path) -> Optional[Dict[str, Any]]:
+def parse_refocus(
+    sample: Dict[str, Any], dataset_images_root: Path
+) -> Optional[Dict[str, Any]]:
     def _format_answer(step: str):
         step = step
-        answer_match = re.search(r'FINAL ANSWER:\s*(.*?)(?:\.|$)', step, re.IGNORECASE)
+        answer_match = re.search(r"FINAL ANSWER:\s*(.*?)(?:\.|$)", step, re.IGNORECASE)
         if answer_match:
             answer = answer_match.group(1).strip()
-            return step.replace(answer_match.group(0), f"\\boxed{{{answer}}}").replace("ANSWER: ", "")
+            return step.replace(answer_match.group(0), f"\\boxed{{{answer}}}").replace(
+                "ANSWER: ", ""
+            )
         return step
 
     def _remove_action_and_code_format(step: str) -> str:
         # 移除代码块
-        step = re.sub(r'\n\nACTION \d+:\n```.*?```', '<abs_vis_token></abs_vis_token>', step, flags=re.DOTALL)
-        return re.sub(r'\n\nACTION \d+:.*?\.\n', '', step, flags=re.DOTALL).strip()
+        step = re.sub(
+            r"\n\nACTION \d+:\n```.*?```",
+            "<abs_vis_token></abs_vis_token>",
+            step,
+            flags=re.DOTALL,
+        )
+        return re.sub(r"\n\nACTION \d+:.*?\.\n", "", step, flags=re.DOTALL).strip()
 
     def _remove_thought_format(step: str) -> str:
         # 移除思考格式
-        return re.sub(r'THOUGHT \d+: ', '', step, flags=re.DOTALL).strip()
+        return re.sub(r"THOUGHT \d+: ", "", step, flags=re.DOTALL).strip()
 
     if sample["edited_image"] == "":
         return None
 
     question = sample["question"]
     gt_answer_text = sample["answer"]
-    main_img = Image.open(dataset_images_root / "images" / sample["image"]).convert("RGB")
+    main_img = Image.open(dataset_images_root / "images" / sample["image"]).convert(
+        "RGB"
+    )
     cot = sample["thoughts"]
     helpers = []
     for i, step in enumerate(cot):
         raw_step = step
-        formatted_step =_remove_thought_format(_remove_action_and_code_format(_format_answer(raw_step)))
+        formatted_step = _remove_thought_format(
+            _remove_action_and_code_format(_format_answer(raw_step))
+        )
         helper_img = None
         if "<abs_vis_token></abs_vis_token>" in formatted_step:
-            helper_img = Image.open(dataset_images_root / "train_raw_data" / sample["edited_image"]).convert("RGB")
-        helpers.append({
-            "step_idx": i,
-            "text": formatted_step,
-            "image": helper_img,
-            "type": "highlight"
-        })
+            helper_img = Image.open(
+                dataset_images_root / "train_raw_data" / sample["edited_image"]
+            ).convert("RGB")
+        helpers.append(
+            {
+                "step_idx": i,
+                "text": formatted_step,
+                "image": helper_img,
+                "type": "highlight",
+            }
+        )
     return {
         "qid": sample["id"],
         "question": add_boxed_instruction(question),
@@ -595,11 +656,12 @@ def parse_refocus(sample: Dict[str, Any], dataset_images_root: Path) -> Optional
     }
 
 
-
-def parse_visual_cot_w_choices(sample: Dict[str, Any], dataset_images_root: Path, dataset_name: str, qid: int) -> Optional[Dict[str, Any]]:
+def parse_visual_cot_w_choices(
+    sample: Dict[str, Any], dataset_images_root: Path, dataset_name: str, qid: int
+) -> Optional[Dict[str, Any]]:
     def _remove_image_pad(text: str) -> str:
         return text.replace("<image>\n", "")
-    
+
     def _remove_instruction(text: str) -> str:
         s = text.find(" Please provide the")
         if s == -1:
@@ -615,7 +677,7 @@ def parse_visual_cot_w_choices(sample: Dict[str, Any], dataset_images_root: Path
             choice_letter = chr(ord(choice_letter) + 1)
         return question
 
-    question =(sample["question"])
+    question = sample["question"]
     choices = sample["multiple_choices"]
     answer = sample["answer"]
     if answer and answer not in choices:
@@ -624,26 +686,35 @@ def parse_visual_cot_w_choices(sample: Dict[str, Any], dataset_images_root: Path
     question_with_choices = _add_choices(question, choices)
     gt_answer_text = sample["answer"]
     sub_dataset_name = dataset_name.split("_")[-1]
-    main_img_path = dataset_images_root / "images" / "cot_image_data" / sub_dataset_name / sample["image"]
+    main_img_path = (
+        dataset_images_root
+        / "images"
+        / "cot_image_data"
+        / sub_dataset_name
+        / sample["image"]
+    )
     if not os.path.exists(main_img_path):
         return None
     main_img = Image.open(main_img_path).convert("RGB")
     bbox = tuple(sample["bboxs"][0])
-    if not valid_bbox(bbox): return None
+    if not valid_bbox(bbox):
+        return None
     helper_img = main_img.crop(bbox)
-    
+
     helpers = [
         {
             "step_idx": 0,
             "text": "<abs_vis_token></abs_vis_token>",
             "image": helper_img,
-            "type": "crop"
+            "type": "crop",
         }
     ]
-    
+
     return {
         "qid": qid,
-        "question": add_boxed_instruction(question_with_choices, allow_None=False, mode="multi_choice"),
+        "question": add_boxed_instruction(
+            question_with_choices, allow_None=False, mode="multi_choice"
+        ),
         "gt_choices": choices,
         "gt_answer_text": gt_answer_text,
         "main_image": main_img,
@@ -651,31 +722,42 @@ def parse_visual_cot_w_choices(sample: Dict[str, Any], dataset_images_root: Path
     }
 
 
-def parse_visual_cot_wo_choices(sample: Dict[str, Any], dataset_images_root: Path, dataset_name: str, qid: int) -> Optional[Dict[str, Any]]:
-    question =(sample["question"])
+def parse_visual_cot_wo_choices(
+    sample: Dict[str, Any], dataset_images_root: Path, dataset_name: str, qid: int
+) -> Optional[Dict[str, Any]]:
+    question = sample["question"]
 
     gt_answer_text = sample["answer"]
     sub_dataset_name = dataset_name.split("_")[-1]
-    main_img_path = dataset_images_root / "images" / "cot_image_data" / sub_dataset_name / sample["image"]
+    main_img_path = (
+        dataset_images_root
+        / "images"
+        / "cot_image_data"
+        / sub_dataset_name
+        / sample["image"]
+    )
     if not os.path.exists(main_img_path):
         return None
     main_img = Image.open(main_img_path).convert("RGB")
     bbox = tuple(sample["bboxs"][0])
-    if not valid_bbox(bbox): return None
+    if not valid_bbox(bbox):
+        return None
     helper_img = main_img.crop(bbox)
-    
+
     helpers = [
         {
             "step_idx": 0,
             "text": "<abs_vis_token></abs_vis_token>",
             "image": helper_img,
-            "type": "crop"
+            "type": "crop",
         }
     ]
-    
+
     return {
         "qid": qid,
-        "question": add_boxed_instruction(question, allow_None=False, mode="single_word"),
+        "question": add_boxed_instruction(
+            question, allow_None=False, mode="single_word"
+        ),
         "gt_choices": None,
         "gt_answer_text": gt_answer_text,
         "main_image": main_img,
@@ -683,30 +765,40 @@ def parse_visual_cot_wo_choices(sample: Dict[str, Any], dataset_images_root: Pat
     }
 
 
-
-
-def parse_zebra_cot(sample: Dict[str, Any], dataset_images_root: Path) -> Optional[Dict[str, Any]]:
-    main_img = sample["problem_image_1"] 
+def parse_zebra_cot(
+    sample: Dict[str, Any], dataset_images_root: Path
+) -> Optional[Dict[str, Any]]:
+    main_img = sample["problem_image_1"]
     if main_img is None:
         return None
-    
+
     def _split_cot_by_thought(text):
-        pattern = r'(?=THOUGHT\s+\d+:)'
+        pattern = r"(?=THOUGHT\s+\d+:)"
         steps = re.split(pattern, text.strip())
 
-        steps = [re.sub(r'^THOUGHT\s+\d+:\s*', '', step).strip() for step in steps if step.strip()]
+        steps = [
+            re.sub(r"^THOUGHT\s+\d+:\s*", "", step).strip()
+            for step in steps
+            if step.strip()
+        ]
         return steps
-    
+
     def _get_img_key(step: str) -> Optional[str]:
-        match = re.search(r'<image_start>\[(reasoning_image_\d+)\]<image_end>', step)
+        match = re.search(r"<image_start>\[(reasoning_image_\d+)\]<image_end>", step)
         if match:
             return match.group(1)
         return None
-    
+
     def _replace_img_pad(step: str):
-        return re.sub(r'<image_start>\[reasoning_image_\d+\]<image_end>', '<abs_vis_token></abs_vis_token>', step)
-    
-    question = sample["Question"].replace(" <image_start>[problem_image_1]<image_end>", "")
+        return re.sub(
+            r"<image_start>\[reasoning_image_\d+\]<image_end>",
+            "<abs_vis_token></abs_vis_token>",
+            step,
+        )
+
+    question = sample["Question"].replace(
+        " <image_start>[problem_image_1]<image_end>", ""
+    )
     cot = sample["Text Reasoning Trace"]
     steps = _split_cot_by_thought(cot)
     helpers = []
@@ -716,17 +808,11 @@ def parse_zebra_cot(sample: Dict[str, Any], dataset_images_root: Path) -> Option
             img_key = _get_img_key(step)
             helper_img = sample[img_key]
             step = _replace_img_pad(step)
-            
-        helper = {
-            "step_idx": i,
-            "text": step,
-            "image": helper_img,
-            "type": "any"
-        }
+
+        helper = {"step_idx": i, "text": step, "image": helper_img, "type": "any"}
         helpers.append(helper)
     gt_answer_text = sample["Final Answer"].strip()
-    
-    
+
     return {
         "qid": None,
         "question": add_boxed_instruction(question, allow_None=False, mode="normal"),
@@ -740,6 +826,7 @@ def parse_zebra_cot(sample: Dict[str, Any], dataset_images_root: Path) -> Option
 # ============================================================
 # conversation 构造（policy round，仅主图+问题）
 # ============================================================
+
 
 def build_policy_conversation(question: str, pil_img: Image.Image) -> Dict[str, Any]:
     return [
@@ -757,7 +844,10 @@ def build_policy_conversation(question: str, pil_img: Image.Image) -> Dict[str, 
 # 保存图像到输出目录
 # ============================================================
 
-def save_images_for_sample(sid: int, out_img_dir: Path, main_img: Image.Image, helpers: List[Dict[str, Any]]):
+
+def save_images_for_sample(
+    sid: int, out_img_dir: Path, main_img: Image.Image, helpers: List[Dict[str, Any]]
+):
     out_img_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     # main
@@ -769,7 +859,7 @@ def save_images_for_sample(sid: int, out_img_dir: Path, main_img: Image.Image, h
     for h in helpers:
         img = h.get("image")
         if img is None:
-            #paths.append(None)
+            # paths.append(None)
             continue
         p = out_img_dir / f"{sid}_{idx}.jpg"
         img.save(p)
@@ -782,6 +872,7 @@ def save_images_for_sample(sid: int, out_img_dir: Path, main_img: Image.Image, h
 # policy 模型推理 (批)
 # ============================================================
 
+
 def run_policy_batch(
     policy_mllm,
     conv_list: List[list],
@@ -793,7 +884,9 @@ def run_policy_batch(
 ) -> Tuple[List[Optional[str]], List[Optional[str]], List[bool]]:
 
     if vllm_mllm_process_batch_from_messages is None:
-        raise RuntimeError("vllm_mllm_process_batch_from_messages 未导入，无法运行 policy 推理。")
+        raise RuntimeError(
+            "vllm_mllm_process_batch_from_messages 未导入，无法运行 policy 推理。"
+        )
 
     # 结果占位
     raw_outs_all: List[Optional[str]] = []
@@ -846,38 +939,66 @@ def run_policy_batch(
 
     return raw_outs_all, extr_outs_all, keep_mask_all
 
+
 # ============================================================
 # 主流程
 # ============================================================
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset-name", type=str, required=True,
-                        help="数据集名称")
-    parser.add_argument("--policy-model-path", type=str, required=True,
-                        help="policy_mllm 模型路径 (如 Qwen2.5-VL-7B-Instruct)")
-    parser.add_argument("--devices", type=str, default="0,1,2,3",
-                        help="逗号分隔 CUDA GPU ID，例如 0,1,2,3")
+    parser.add_argument("--dataset-name", type=str, required=True, help="数据集名称")
+    parser.add_argument(
+        "--policy-model-path",
+        type=str,
+        required=True,
+        help="policy_mllm 模型路径 (如 Qwen2.5-VL-7B-Instruct)",
+    )
+    parser.add_argument(
+        "--devices",
+        type=str,
+        default="0,1,2,3",
+        help="逗号分隔 CUDA GPU ID，例如 0,1,2,3",
+    )
     parser.add_argument("--max-model-len", type=int, default=8192)
-    parser.add_argument("--dtype", type=str, default="bfloat16",
-                        choices=["bfloat16", "float16", "auto"],
-                        help="模型精度")
-    parser.add_argument("--backend", type=str, default="mp", choices=["mp", "ray"],
-                        help="vLLM 分布式后端；建议 mp 单节点稳定")
-    parser.add_argument("--out-root", type=str, default="./created_dataset/filtered_data/",
-                        help="输出根目录")
-    parser.add_argument("--start-id", type=int, default=0,
-                        help="Stage1 样本起始 id (避免断点重复)")
-    parser.add_argument("--limit", type=int, default=-1,
-                        help="最多处理多少条；-1 表示全部")
+    parser.add_argument(
+        "--dtype",
+        type=str,
+        default="bfloat16",
+        choices=["bfloat16", "float16", "auto"],
+        help="模型精度",
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default="mp",
+        choices=["mp", "ray"],
+        help="vLLM 分布式后端；建议 mp 单节点稳定",
+    )
+    parser.add_argument(
+        "--out-root",
+        type=str,
+        default="./created_dataset/filtered_data/",
+        help="输出根目录",
+    )
+    parser.add_argument(
+        "--start-id", type=int, default=0, help="Stage1 样本起始 id (避免断点重复)"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=-1, help="最多处理多少条；-1 表示全部"
+    )
     parser.add_argument("--judge_llm_dir", type=str, default=None)
     parser.add_argument("--judge_llm_tensor_parallel_size", type=int, default=2)
-    parser.add_argument("--policy_mllm_tensor_parallel_size", type=int, default=2,
-                        help="policy_mllm 模型的 tensor parallel size")
+    parser.add_argument(
+        "--policy_mllm_tensor_parallel_size",
+        type=int,
+        default=2,
+        help="policy_mllm 模型的 tensor parallel size",
+    )
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
-    #os.environ.setdefault("VLLM_TENSOR_PARALLEL_SIZE", str(args.tensor_parallel_size))
+    # os.environ.setdefault("VLLM_TENSOR_PARALLEL_SIZE", str(args.tensor_parallel_size))
 
     # 数据集路径
     ds_cfg = DEFAULT_DATASETS[args.dataset_name]
@@ -893,12 +1014,16 @@ def main():
 
     # 加载模型 processor/tokenizer
     print("[Load tokenizer/processor]", args.policy_model_path)
-    tokenizer = AutoTokenizer.from_pretrained(args.policy_model_path, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.policy_model_path, trust_remote_code=True
+    )
     processor = AutoProcessor.from_pretrained(args.policy_model_path)
 
     # 加载 policy 模型
     print("[Init policy_mllm]")
-    policy_mllm, sampling_params = vllm_mllm_init(args.policy_model_path, tp=args.policy_mllm_tensor_parallel_size)
+    policy_mllm, sampling_params = vllm_mllm_init(
+        args.policy_model_path, tp=args.policy_mllm_tensor_parallel_size
+    )
 
     # ------------------ 加载原始数据 ------------------
     print(f"[Load dataset] {args.dataset_name} -> {dataset_path}")
@@ -918,12 +1043,11 @@ def main():
         if args.dataset_name == "Zebra_CoT_visual_search":
             data_root = ds_cfg["dataset_path"]
             samples = load_dataset(
-                "parquet",                        # 数据格式
+                "parquet",  # 数据格式
                 data_files={"train": f"{data_root}/train-*.parquet"},
                 split="train",
-                cache_dir=".cache"                # 可写可不写；默认还是 ~/.cache/huggingface
+                cache_dir=".cache",  # 可写可不写；默认还是 ~/.cache/huggingface
             )
-
 
     if args.limit > 0:
         if isinstance(samples, list):
@@ -932,25 +1056,32 @@ def main():
             # datasets.Dataset 需要用 .select() 方法
             samples = samples.select(range(args.limit))
 
-
     # ------------------ 解析所有样本 ------------------
     parsed_recs = []  # 暂存解析后的样本（含 PIL）
-    convs = []         # policy 推理输入
+    convs = []  # policy 推理输入
     questions = []
     for idx, samp in enumerate(tqdm(samples, desc="Parse samples")):
         rec = None
         if args.dataset_name == "PixelReasoner":
             rec = parse_pixelreasoner(samp, dataset_images_root)
         elif "CoM" in args.dataset_name:
-            rec = parse_com(samp, dataset_images_root, w_mathvista=("w_MathVista" in args.dataset_name))
+            rec = parse_com(
+                samp,
+                dataset_images_root,
+                w_mathvista=("w_MathVista" in args.dataset_name),
+            )
         elif args.dataset_name == "CoF":
             rec = parse_cof(samp, dataset_images_root)
         elif args.dataset_name == "ReFocus":
             rec = parse_refocus(samp, dataset_images_root)
         elif args.dataset_name == "Visual_CoT_v7w":
-            rec = parse_visual_cot_w_choices(samp, dataset_images_root, args.dataset_name, idx)
+            rec = parse_visual_cot_w_choices(
+                samp, dataset_images_root, args.dataset_name, idx
+            )
         elif args.dataset_name == "Visual_CoT_gqa":
-            rec = parse_visual_cot_wo_choices(samp, dataset_images_root, args.dataset_name, idx)
+            rec = parse_visual_cot_wo_choices(
+                samp, dataset_images_root, args.dataset_name, idx
+            )
         elif "Zebra_CoT" in args.dataset_name:
             rec = parse_zebra_cot(samp, dataset_images_root)
         if rec is None:
@@ -976,7 +1107,7 @@ def main():
         tokenizer,
         max_model_len=args.max_model_len,
     )
-    vllm_kill_model(policy_mllm)  # 
+    vllm_kill_model(policy_mllm)  #
     # ------------------ 判分并写出 ------------------
     # ground truth list
     gts = [r["gt_answer_text"] for r in parsed_recs]
@@ -984,12 +1115,19 @@ def main():
 
     # use batch_judge
     if args.judge_llm_dir is not None:
-        judge_llm, _ = vllm_llm_init(args.judge_llm_dir, tp=args.judge_llm_tensor_parallel_size)
-        judged = llm_batch_judge(extr_outs, gts, judge_llm, questions=questions if len(questions) > 0 else None)
+        judge_llm, _ = vllm_llm_init(
+            args.judge_llm_dir, tp=args.judge_llm_tensor_parallel_size
+        )
+        judged = llm_batch_judge(
+            extr_outs,
+            gts,
+            judge_llm,
+            questions=questions if len(questions) > 0 else None,
+        )
     else:
-        #judged = batch_judge(extr_outs, gts, choices_list, llm=judge_llm, questions=questions if len(questions)>0 else None)
+        # judged = batch_judge(extr_outs, gts, choices_list, llm=judge_llm, questions=questions if len(questions)>0 else None)
         judged = quick_batch_judge(extr_outs, gts, gt_choices=choices_list)
-    
+
     sid = args.start_id
     kept = 0
     skipped_policy_correct = 0
@@ -997,7 +1135,9 @@ def main():
     skipped_parse = len(samples) - len(parsed_recs)
 
     with open(out_jsonl, "w", encoding="utf-8") as fw:
-        for rec, raw_pred, extr_pred, keep, ok in zip(parsed_recs, raw_outs, extr_outs, keep_mask, judged):
+        for rec, raw_pred, extr_pred, keep, ok in zip(
+            parsed_recs, raw_outs, extr_outs, keep_mask, judged
+        ):
             if not keep:
                 skipped_overlen += 1
                 continue
@@ -1005,7 +1145,9 @@ def main():
                 skipped_policy_correct += 1
                 continue
             # 保存图像
-            paths = save_images_for_sample(sid, out_img_dir, rec["main_image"], rec["helpers"])
+            paths = save_images_for_sample(
+                sid, out_img_dir, rec["main_image"], rec["helpers"]
+            )
             main_path = paths[0]
             # 回填 helper 图像路径
             img_idx = 1
@@ -1027,7 +1169,9 @@ def main():
                 "gt_choices": rec["gt_choices"],
                 "gt_answer_text": rec["gt_answer_text"],
                 "image_main": main_path,
-                "helpers": rec["helpers"],  # list[{'step_idx','text','image_path','type'}]
+                "helpers": rec[
+                    "helpers"
+                ],  # list[{'step_idx','text','image_path','type'}]
                 "policy_pred_raw": raw_pred,
                 "policy_pred_extracted": extr_pred,
                 "policy_correct": False,
