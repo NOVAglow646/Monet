@@ -1,24 +1,22 @@
-# Training stage 1
-export NCCL_P2P_DISABLE=1
-export CUDA_VISIBLE_DEVICES=2,3
-python src/main.py \
-    --model Qwen/Qwen2.5-VL-7B-Instruct --epochs 10 \
-    --task vsp-spatial-reasoning \
-    --latent_size 4 \
-    --stage stage1 \
-    --data_path ./data/sample.jsonl \
-    --log_file ./log.txt \
-    --load_model_path /data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct \
-    --save_model_path ./checkpoints/model_stage1
-
-# Training stage 2
-
-python src/main.py \
-    --model Qwen/Qwen2.5-VL-7B-Instruct --epochs 10 \
-    --task vsp-spatial-reasoning \
-    --latent_size 4 \
-    --stage stage2 \
-    --data_path ./data/sample.jsonl \
-    --log_file ./log.txt \
-    --load_model_path ./checkpoints/model_stage1
-    --save_model_path ./checkpoints/model_stage2
+conda activate mirage
+cd /home/dids/shiyang/codes/abstract-visual-token
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+python -m src.main \
+    --model "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
+    --epochs "10" \
+    --task "mm-reasoning" \
+    --min_latent_size 6 \
+    --min_latent_compress_factor 20 \
+    --max_latent_compress_factor 40 \
+    --stage "avt_stage1" \
+    --data_path "./new/created_dataset/filtered_data/CoF/filtered_train.json" \
+    "./new/created_dataset/filtered_data/CoM_w_MathVista/filtered_train.json" \
+    "./new/created_dataset/filtered_data/PixelReasoner/filtered_train.json" \
+    "./new/created_dataset/filtered_data/ReFocus/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_visual_search/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_geometry/filtered_train.json" \
+    --log_file "./log.txt" \
+    --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
+    --save_model_path "./checkpoints/model_stage1" \
+    --alignment "observation_all"

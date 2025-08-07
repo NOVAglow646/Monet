@@ -91,19 +91,20 @@ _STEP_RE_TPL = r"<STEP_{i}>\s*(.*?)\s*<END_STEP_{i}>"
 _FINAL_RE = re.compile(r"<FINAL_STEP>\s*(.*?)\s*<END_FINAL_STEP>", re.S)
 
 
-def parse_aligned_text(text: str, k: int) -> Tuple[List[str], str]:
-    """Parse alignment output. Return (aligned_steps[0..k], aligned_final)."""
+def parse_aligned_text(text: str) -> List[str]:
     aligned_steps = []
-    for i in range(k + 1):  # steps 0..k
+    i = 0
+    #print(text)
+    while True:
         pat = re.compile(_STEP_RE_TPL.format(i=i), re.S)
         m = pat.search(text)
         if m:
             aligned_steps.append(m.group(1).strip())
         else:
-            aligned_steps.append("")  # fallback later
-    m = _FINAL_RE.search(text)
-    aligned_final = m.group(1).strip() if m else ""
-    return aligned_steps, aligned_final
+            break  # fallback later
+        i += 1
+    
+    return aligned_steps
 
 
 # ---------------------------------------------------------------------------
@@ -151,9 +152,8 @@ def batch_align_concat(
 
 
 def make_final_cot(
-    sample: Dict[str, Any], aligned_steps: List[str], aligned_final: str
+    sample: Dict[str, Any], aligned_steps: List[str]
 ) -> List[Dict[str, Any]]:
-    k = sample["first_correct_helper_idx"]
     helpers = sample.get("helpers", [])
     # system
     cot = [
@@ -175,22 +175,12 @@ def make_final_cot(
     cot.append({"role": "user", "content": uc})
     # assistant (aligned per-step)
     ac = []
-    for i in range(k + 1):
-        if i < len(helpers):
-            txt_al = (
-                aligned_steps[i].strip()
-                if i < len(aligned_steps)
-                else helpers[i].get("text", "")
-            )
-            if not txt_al:
-                txt_al = helpers[i].get("text", "")  # fallback
-            ac.append({"type": "text", "text": txt_al})
-            ip = helpers[i].get("image_path")
-            if ip:
-                ac.append({"type": "image", "image_file_name": ip})
-    # final strong segment
-    final_txt = aligned_final.strip()
-    ac.append({"type": "text", "text": final_txt})
+    for i, txt_al in enumerate(aligned_steps):
+        ac.append({"type": "text", "text": txt_al})
+        ip = helpers[i].get("image_path")
+        if ip:
+            ac.append({"type": "image", "image_file_name": ip})
+
     cot.append({"role": "assistant", "content": ac})
     return cot
 
@@ -206,11 +196,12 @@ def main():
     )
     ap.add_argument("--stage2", required=True, help="Stage2 JSONL")
     ap.add_argument("--llm-path", help="alignment text-only 模型路径", default="")
+    ap.add_argument("--judge_llm_tensor_parallel_size", type=int, default=4, help="judge_llm tensor parallel size")
     ap.add_argument("--devices", default="0,1,2,3", help="GPU IDs")
     ap.add_argument("--out-json", required=True, help="输出训练 JSON list")
     ap.add_argument("--max-records", type=int, default=None)
     ap.add_argument("--align-batch", type=int, default=4096)
-    ap.add_argument("--api_model_name", default="gemini-2.5-pro", choices=["gemini-2.5-pro", "deepseek-chat"])
+    ap.add_argument("--api_model_name", default=None, choices=["gemini-2.5-pro", "deepseek-chat"])
     args = ap.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
@@ -236,7 +227,7 @@ def main():
     full_texts: List[str] = []
     seg_counts: List[int] = []
     for r in good:
-        ft, nseg = build_alignment_text_for_sample_last_strong(r)
+        ft, nseg = build_alignment_text_for_sample(r)
         full_texts.append(ft)
         seg_counts.append(nseg)  # k+1 (helpers) + final
 
@@ -250,28 +241,30 @@ def main():
         api_model_name = args.api_model_name
     else:
         print(f"[Stage3] loading alignment LLM: {args.llm_path}")
-        llm, sampling_params = vllm_llm_init(args.llm_path)
+        llm, sampling_params = vllm_llm_init(args.llm_path, tp=args.judge_llm_tensor_parallel_size)
         tokenizer = AutoTokenizer.from_pretrained(args.llm_path, trust_remote_code=True)
 
     # 批 alignment
     dataset_name = args.stage2.split("/")[-2]
-    aligned_texts = batch_align_concat(
-        dataset_name,
-        full_texts,
-        llm,
-        sampling_params,
-        tokenizer,
-        batch_size=args.align_batch,
-        api_model_name=api_model_name,
-    )
-    assert len(aligned_texts) == len(good)
+    if llm is not None or api_model_name is not None:   
+        aligned_texts = batch_align_concat(
+            dataset_name,
+            full_texts,
+            llm,
+            sampling_params,
+            tokenizer,
+            batch_size=args.align_batch,
+            api_model_name=api_model_name,
+        )
+        assert len(aligned_texts) == len(good)
+    else:
+        raise NotImplementedError("Either llm or api_model_name must be provided for alignment.")
 
     # 解析 & 打包
     finals = []
     for rec, txt_al, nseg in zip(good, aligned_texts, seg_counts):
-        k = rec["first_correct_helper_idx"]
-        step_texts, final_txt = parse_aligned_text(txt_al, k)
-        cot = make_final_cot(rec, step_texts, final_txt)
+        step_texts= parse_aligned_text(txt_al)
+        cot = make_final_cot(rec, step_texts)
         finals.append(cot)
 
     save_json(finals, args.out_json)

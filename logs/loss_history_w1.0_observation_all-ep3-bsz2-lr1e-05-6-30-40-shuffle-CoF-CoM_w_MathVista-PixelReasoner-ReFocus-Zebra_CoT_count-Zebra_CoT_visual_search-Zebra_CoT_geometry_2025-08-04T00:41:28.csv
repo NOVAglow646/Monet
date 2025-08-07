@@ -1,0 +1,2 @@
+global_step,epoch,loss_total,loss_student_ce,loss_teacher_ce,loss_align
+0,0,inf,2.4740097522735596,2.4328296184539795,inf

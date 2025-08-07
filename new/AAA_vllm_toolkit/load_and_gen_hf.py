@@ -6,10 +6,10 @@ qwen_series = ["Qwen2.5-VL-7B", "Qwen2-VL-7B", "ThinkLite-VL-7B", "Vision-R1", "
 qwen_instruct_prompt = "\n\nPlease reason step by step, and put your final answer within \\boxed{}"
 qwen_RL_instruct_prompt = r"You FIRST think about the reasoning process as an internal monologue and then provide the final answer. The reasoning process MUST BE enclosed within <think> </think> tags. The final answer MUST BE put in \boxed{}."
 
-def hf_mllm_init(mllm_dir, device="cuda:0"):
+def hf_mllm_init(mllm_dir):
     if any([x in mllm_dir for x in qwen_series]):
         model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            mllm_dir, torch_dtype="auto", device_map=device
+            mllm_dir, torch_dtype="auto", device_map="auto"
         )
         processor = AutoProcessor.from_pretrained(
             mllm_dir, min_pixels=256*28*28, max_pixels=1280*28*28,

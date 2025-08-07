@@ -1,5 +1,31 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Stage 2: Strong 模型 Helper 顺序增量评测（批推理版 + 提前答案剔除 / 最小改动）
+==========================================================================
+
+这是在你提供的 *batch* 版 Stage2 脚本基础上做的**最小必要修改**，只新增一条规则：
+
+**若任意 helper step 文本中出现 `\boxed{...}`（不管内容是什么，也不与 GT 对比），且该 step 的索引 < strong_mllm 首次答对步 (`first_correct_helper_idx`)，则剔除该样本，不写入主输出。**
+
+其它逻辑（批推理、token 限长、断点续跑等）保持原样；仅在写出阶段执行过滤。
+
+可选：用 `--leak-log <path>` 将被剔除样本单独保存，便于检查；若不提供，只在 stdout 打印计数。
+
+---
+运行示例：
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+python stage2_strong_helper_eval_leak.py \
+  --stage1 ./created_dataset/filtered_data/CoF/stage1_policy_out.jsonl \
+  --out    ./created_dataset/filtered_data/CoF/stage2_strong_out.jsonl \
+  --model-path /data1/qxwang/checkpoints/Qwen2.5-VL-7B-Instruct \
+  --devices 0,1,2,3 \
+  --token-limit 8192 \
+  --resume \
+  --leak-log ./created_dataset/filtered_data/CoF/stage2_leak_dropped.jsonl
+```
+"""
 
 from __future__ import annotations
 import os
@@ -7,11 +33,10 @@ import io
 import json
 import argparse
 from typing import List, Dict, Any, Optional, Tuple
-from collections import deque
+
 from tqdm import tqdm
 from PIL import Image
 from transformers import AutoTokenizer, AutoProcessor
-import gc
 
 # --- 用户工程工具 ---
 from AAA_vllm_toolkit.load_and_gen_vllm import (
@@ -27,7 +52,7 @@ from AAA_vllm_toolkit.extract_and_check import (
     batch_judge,
     quick_batch_judge,
     llm_batch_judge,
-    #llm_batch_extract
+    llm_batch_extract
 )
 
 
@@ -77,87 +102,6 @@ def load_stage1(path: str) -> List[Dict[str, Any]]:
             continue
         recs.append(rec)
     return recs
-
-def iter_stage1(path: str):
-    """Yield Stage‑1 samples one by one to avoid big resident memory."""
-    with open(path, 'r', encoding='utf-8') as f:
-        head = f.read(1)
-        f.seek(0)
-        if head == '[':
-            for rec in json.load(f):
-                if not rec.get('policy_correct'):
-                    yield rec
-        else:
-            for ln in f:
-                if not ln.strip():
-                    continue
-                rec = json.loads(ln)
-                if not rec.get('policy_correct'):
-                    yield rec
-
-class IncrementalWriter:
-    """Append‑only JSONL writer to keep memory small."""
-
-    def __init__(self, path: str):
-        self.f = open(path, 'a', encoding='utf-8')
-        self.first = self.f.tell() == 0
-
-    def write(self, rec: Dict[str, Any]):
-        txt = json.dumps(rec, ensure_ascii=False)
-        if not self.first:
-            self.f.write('\n')
-        self.f.write(txt)
-        self.first = False
-        self.f.flush()
-
-    def close(self):
-        self.f.close()
-
-def init_state(rec: dict) -> dict:
-    """Create runtime state for one sample."""
-    return {
-        "rec": rec,
-        "strong_steps": [],
-        "first_correct_helper_idx": None,
-        "truncated": False,
-        "done": False,
-    }
-
-def flush_completed(states: deque,
-                    writer: "IncrementalWriter",
-                    leak_writer: "IncrementalWriter | None"):
-    """Write finished samples to disk and remove them from `states`."""
-    remained = deque()
-    for st in states:
-        if st["done"]:
-            # early‑answer filtering (same rule as before)
-            fc = st["first_correct_helper_idx"]
-            leak = False
-            if fc is not None:
-                leak_idx = None
-                for i, h in enumerate(st["rec"].get("helpers", [])):
-                    txt = (h.get("text") or "").replace("\\\\", "\\").lower()
-                    if "\\boxed" in txt or "answer" in txt:
-                        leak_idx = i
-                        break
-                if leak_idx is not None and leak_idx < fc + 1:
-                    leak = True
-
-            #target_writer = leak_writer if leak else writer
-            if not leak:
-                writer.write({
-                    **st["rec"],
-                    "strong_steps": st["strong_steps"],
-                    "first_correct_helper_idx": st["first_correct_helper_idx"],
-                    "truncated": st["truncated"],
-                })
-            # free memory
-            del st
-        else:
-            remained.append(st)
-    states.clear()
-    states.extend(remained)
-    gc.collect()   # ensure Python heap is cleaned
 
 
 def load_done_map(path: str) -> Dict[Tuple[str,int], Dict[str,Any]]:
@@ -290,11 +234,8 @@ def run_batch_step(
             gen_convs.append(eff_convs[sub_i])
 
     sub_results = {}
-    valid_cnt = len(gen_convs)
-    print(f"Step {step_idx}: {valid_cnt} remaining")
     if gen_convs:
         gen_inputs = vllm_mllm_process_batch_from_messages(gen_convs, processor)
-        print("Inference using a strong MLLM...")
         outs = model.generate(gen_inputs, sampling_params=sampling_params, use_tqdm=True)
         for sub_i, out in zip(gen_idx, outs):
             txt = out.outputs[0].text.strip() if out.outputs else ""
@@ -341,21 +282,29 @@ def run_batch_step(
 
     judge_llm_initailized = False
     if judge_preds:
-
-        if judge_llm_dir is not None:
-            if not judge_llm_initailized:
-                judge_llm, _ = vllm_llm_init(judge_llm_dir, tp=judge_llm_tensor_parallel_size)
+        try:
+            if judge_llm_dir is not None:
+                if not judge_llm_initailized:
+                    judge_llm, _ = vllm_llm_init(judge_llm_dir, tp=judge_llm_tensor_parallel_size)
+                else:
+                    judge_llm = vllm_wake_model(judge_llm)
+                if use_llm_to_extract_answers:
+                    judge_gt = llm_batch_extract(judge_gt, judge_llm, questions, recs[0].get("dataset_name"))
+                judge_llm_initailized = True
+                flags = llm_batch_judge(judge_preds, judge_gt, judge_llm, questions)
+                vllm_kill_model(judge_llm)
             else:
-                judge_llm = vllm_wake_model(judge_llm)
-            #if use_llm_to_extract_answers:
-            #    judge_gt = llm_batch_extract(judge_gt, judge_llm, questions, recs[0].get("dataset_name"))
-            judge_llm_initailized = True
-            flags = llm_batch_judge(judge_preds, judge_gt, judge_llm, questions)
-            vllm_kill_model(judge_llm)
-        else:
-            #flags = batch_judge(judge_preds, judge_gt, judge_choices, questions=questions if len(questions)>0 else None, llm=judge_llm)
-            flags = quick_batch_judge(judge_preds, judge_gt, judge_choices)
-
+                #flags = batch_judge(judge_preds, judge_gt, judge_choices, questions=questions if len(questions)>0 else None, llm=judge_llm)
+                flags = quick_batch_judge(judge_preds, judge_gt, judge_choices)
+            #
+        except Exception:
+            # fallback：简单大小写比较
+            flags = []
+            for p,g,c in zip(judge_preds, judge_gt, judge_choices):
+                if p is None or g is None:
+                    flags.append(False)
+                else:
+                    flags.append(str(p).strip().lower() == str(g).strip().lower())
         for flg, sub_k in zip(flags, judge_map):
             eff_ret[sub_k]["correct"] = bool(flg)
 
@@ -376,48 +325,6 @@ def run_batch_step(
     
     vllm_wake_model(model)
     return ret_full
-
-def run_one_step_for_all(states: deque, step_idx: int,
-                         model, processor, tokenizer, token_limit,
-                         sampling_params, judge_llm_dir, judge_llm_tp,
-                         use_llm_to_extract):
-    """Apply `run_batch_step` to current active states (same helpers count)."""
-    # gather records for which this step exists and not done/truncated
-    batch_recs, idx_map = [], []
-    for i, st in enumerate(states):
-        if st["done"]:
-            continue
-        if step_idx >= len(st["rec"].get("helpers", [])):
-            continue
-        batch_recs.append(st["rec"])
-        idx_map.append(i)
-
-    if not batch_recs:
-        return
-
-    res_list = run_batch_step(batch_recs, step_idx, model, processor,
-                              tokenizer, token_limit, sampling_params,
-                              judge_llm_dir, judge_llm_tp,
-                              use_llm_to_extract)
-
-    # write back results
-    for loc, st_idx in enumerate(idx_map):
-        st = states[st_idx]
-        ret = res_list[loc]
-        st["strong_steps"].append({
-            "ctx_upto_step": step_idx,
-            "pred_raw": ret["pred_raw"],
-            "pred_extracted": ret["pred_extracted"],
-            "correct": ret["correct"],
-            "token_count": ret["token_count"],
-            "truncated": ret["truncated"],
-        })
-        if ret["truncated"]:
-            st["truncated"] = True
-            st["done"] = True
-        elif ret["correct"] and st["first_correct_helper_idx"] is None:
-            st["first_correct_helper_idx"] = step_idx
-            st["done"] = True
 
 
 # -----------------------------------------------------------------------------
@@ -450,47 +357,121 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     processor = AutoProcessor.from_pretrained(args.model_path)
 
-    # writers
-    writer = IncrementalWriter(args.out)
-    leak_writer = IncrementalWriter(args.leak_log) if args.leak_log else None
+    # 读 Stage1
+    recs = load_stage1(args.stage1)
+    if args.max_samples is not None:
+        recs = recs[: args.max_samples]
+    print(f"[Stage2] loaded {len(recs)} policy-wrong samples from Stage1.")
 
-    # runtime queues
-    active_states: deque = deque()
-    stage1_iter = iter_stage1(args.stage1)
+    # resume map
+    done_map = load_done_map(args.out) if args.resume else {}
+    if done_map:
+        print(f"[Stage2] resume: found {len(done_map)} done records in {args.out}.")
 
-    # read‑stream loop
-    for idx, rec in enumerate(stage1_iter):
-        if args.max_samples and idx >= args.max_samples:
-            break
-        active_states.append(init_state(rec))
+    # state 初始化（剔除已完成）
+    state = []  # list[dict]
+    for rec in recs:
+        key = (rec.get('dataset_name'), rec.get('orig_idx'))
+        if key in done_map:
+            continue
+        state.append({
+            'rec': rec,
+            'done': False,
+            'strong_steps': [],
+            'first_correct_helper_idx': None,
+            'truncated': False,
+        })
+    print(f"[Stage2] {len(state)} samples to process.")
 
-        # if batch full, process one step for each active sample
-        if len(active_states) >= args.max_batch > 0:
-            run_one_step_for_all(active_states, step_idx=0,  # first step
-                                 model=model, processor=processor,
-                                 tokenizer=tokenizer, token_limit=args.token_limit,
-                                 sampling_params=sampling_params,
-                                 judge_llm_dir=args.judge_llm_dir,
-                                 judge_llm_tp=args.judge_llm_tensor_parallel_size,
-                                 use_llm_to_extract=args.use_llm_to_extract_answers)
+    # 计算最大 helper 步数
+    max_steps = 0
+    for st in state:
+        n = len(st['rec'].get('helpers', []))
+        if n > max_steps:
+            max_steps = n
 
-            flush_completed(active_states, writer, leak_writer)
+    # 主循环：逐 step 批推理
+    for step_idx in range(max_steps):
+        active_idx = [i for i,st in enumerate(state) if (not st['done']) and (step_idx < len(st['rec'].get('helpers', [])))]
+        if not active_idx:
+            continue
+        if args.max_batch and args.max_batch > 0:
+            chunks = [active_idx[i:i+args.max_batch] for i in range(0,len(active_idx),args.max_batch)]
+        else:
+            chunks = [active_idx]
 
-    # after reading whole file, continue processing remaining states
-    step_idx = 0
-    while active_states:
-        step_idx += 1
-        run_one_step_for_all(active_states, step_idx,
-                             model, processor, tokenizer,
-                             args.token_limit, sampling_params,
-                             args.judge_llm_dir, args.judge_llm_tensor_parallel_size,
-                             args.use_llm_to_extract_answers)
-        flush_completed(active_states, writer, leak_writer)
+        print(f"[Stage2] step{step_idx}: {len(active_idx)} active")
+        for ch in chunks:
+            batch_recs = [state[i]['rec'] for i in ch]
+            res_list = run_batch_step(batch_recs, step_idx, model, processor, tokenizer, args.token_limit, sampling_params, judge_llm_dir=args.judge_llm_dir, judge_llm_tensor_parallel_size=args.judge_llm_tensor_parallel_size, use_llm_to_extract_answers=args.use_llm_to_extract_answers)
+            # 写回
+            for loc_i, st_idx in enumerate(ch):
+                st = state[st_idx]
+                ret = res_list[loc_i]
+                st['strong_steps'].append({
+                    'ctx_upto_step': step_idx,
+                    'pred_raw': ret['pred_raw'],
+                    'pred_extracted': ret['pred_extracted'],
+                    'correct': ret['correct'],
+                    'token_count': ret['token_count'],
+                    'truncated': ret['truncated'],
+                })
+                if ret['truncated']:
+                    st['truncated'] = True
+                    st['done'] = True
+                elif ret['correct'] and st['first_correct_helper_idx'] is None:
+                    st['first_correct_helper_idx'] = step_idx
+                    st['done'] = True
 
-    # close file handles
-    writer.close()
-    if leak_writer:
-        leak_writer.close()
+    # 合并 + 写出（含已完成）
+    out_records = list(done_map.values())
+    for st in state:
+        rec = dict(st['rec'])
+        rec['strong_steps'] = st['strong_steps']
+        rec['first_correct_helper_idx'] = st['first_correct_helper_idx']
+        rec['truncated'] = st['truncated']
+        out_records.append(rec)
+
+    # 稳定排序（按 dataset_name, orig_idx）
+    out_records.sort(key=lambda r: (r.get('dataset_name'), r.get('orig_idx')))
+
+    # === 新增：提前答案过滤 ===
+    dropped = []
+    kept = []
+    for rec in out_records:
+        fc = rec.get('first_correct_helper_idx')
+        if fc is None:
+            kept.append(rec)  # strong 从未答对 -> 保留（如需剔除可改这里）
+            continue
+        # 检测 helper 中最早出现 \boxed 的步（不关心内容，只看出现）
+        leak_idx = None
+        for i,h in enumerate(rec.get('helpers', [])):
+            txt = (h.get('text') or "")
+            tnorm = txt.replace('\\\\','\\').lower()
+            if '\\boxed' in tnorm or "answer" in tnorm:  # 兼容 "\\boxed" / "\boxed"
+                leak_idx = i
+                break
+        if leak_idx is not None and leak_idx < fc + 1: # +1 因为 strong_mllm 只看 ctx_upto_step
+            dropped.append(rec)
+        else:
+            kept.append(rec)
+
+    # 写主输出
+    with open(args.out, 'w', encoding='utf-8') as f:
+        for i,rec in enumerate(kept):
+            if i: f.write('\n')
+            f.write(json.dumps(rec, ensure_ascii=False))
+    print(f"[Stage2] wrote {len(kept)} records -> {args.out}")
+
+    # 可选泄露日志
+    if args.leak_log:
+        with open(args.leak_log, 'w', encoding='utf-8') as f:
+            for i,rec in enumerate(dropped):
+                if i: f.write('\n')
+                f.write(json.dumps(rec, ensure_ascii=False))
+        print(f"[Stage2] dropped {len(dropped)} leak records -> {args.leak_log}")
+    else:
+        print(f"[Stage2] dropped {len(dropped)} leak records (no log saved)")
 
 if __name__ == "__main__":
     main()

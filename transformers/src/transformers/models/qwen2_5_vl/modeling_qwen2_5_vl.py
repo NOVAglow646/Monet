@@ -1981,12 +1981,12 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
     @replace_return_docstrings(output_type=Qwen2_5_VLCausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
+        input_ids: torch.LongTensor = None, # i.e., student input_ids. This is to be compatible with the original Qwen2.5-VL model.
+        attention_mask: Optional[torch.Tensor] = None, # i.e., student attention_mask
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
+        labels: Optional[torch.LongTensor] = None, # i.e., student labels
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -2003,16 +2003,14 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         image_out_mask: Optional[torch.Tensor] = None, # Ours (Latent Token Mask)
         generate_mode: Optional[bool] = False,
         latent_hidden_states: Optional[torch.Tensor] = None, # Ours (Latent Tokens)
-        student_input_ids: torch.LongTensor = None, # AVT
         teacher_input_ids: torch.LongTensor = None, # AVT
-        student_attention_mask: Optional[torch.Tensor] = None, # AVT
         teacher_attention_mask: Optional[torch.Tensor] = None, # AVT
-        student_labels: Optional[torch.LongTensor] = None, # AVT
         teacher_labels: Optional[torch.LongTensor] = None, # AVT
         student_alignment_poss: Optional[List[List]] = None, # AVT
         teacher_alignment_poss: Optional[List[List]] = None, # AVT
         student_image_out_mask: Optional[torch.Tensor] = None, # AVT
         teacher_image_out_mask: Optional[torch.Tensor] = None, # AVT
+        teacher_mode: Optional[bool] = False, # AVT
     ) -> Union[Tuple, Qwen2_5_VLCausalLMOutputWithPast]:
         r"""
             labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -2057,97 +2055,86 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         # print('Image grid thw:', image_grid_thw.shape)
         # exit()
         
-        
-        student_inputs_embeds, student_attention_mask, output_attentions, output_hidden_states, return_dict\
-            = self.forward_preparation(
-            input_ids=student_input_ids,
-            attention_mask=student_attention_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-            pixel_values=user_pixel_values,
-            image_grid_thw=user_image_grid_thw,
-            pixel_values_latent=None, # Ours (Latent Tokens)
-            image_grid_thw_latent=None,  # Ours (Latent Tokens)
-            generate_mode=generate_mode,
-            latent_hidden_states=latent_hidden_states,  # Ours (Latent Tokens)
-        )
-        
-        teacher_inputs_embeds, teacher_attention_mask, output_attentions, output_hidden_states, return_dict\
-            = self.forward_preparation(
-            input_ids=teacher_input_ids,
-            attention_mask=teacher_attention_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-            pixel_values=user_assistant_pixel_values,
-            image_grid_thw=user_assistant_image_grid_thw,
-            pixel_values_latent=None, #teacher_pixel_values, # Ours (Latent Tokens)
-            image_grid_thw_latent=None, #teacher_image_grid_thw,  # Ours (Latent Tokens)
-            generate_mode=generate_mode,
-            latent_hidden_states=latent_hidden_states,  # Ours (Latent Tokens)
-        )
+        if not teacher_mode:
+            student_inputs_embeds, attention_mask, output_attentions, output_hidden_states, return_dict\
+                = self.forward_preparation(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                pixel_values=user_pixel_values,
+                image_grid_thw=user_image_grid_thw,
+                pixel_values_latent=None, # Ours (Latent Tokens)
+                image_grid_thw_latent=None,  # Ours (Latent Tokens)
+                generate_mode=generate_mode,
+                latent_hidden_states=latent_hidden_states,  # Ours (Latent Tokens)
+            )
+                
+            output = self.forward_latent_embeds(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=student_inputs_embeds,
+                labels=labels,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                image_grid_thw=user_image_grid_thw,
+                video_grid_thw=video_grid_thw,
+                rope_deltas=rope_deltas,
+                cache_position=cache_position,
+                second_per_grid_ts=second_per_grid_ts,
+                generate_mode=generate_mode
+            )
+        else:
+            teacher_inputs_embeds, teacher_attention_mask, output_attentions, output_hidden_states, return_dict\
+                = self.forward_preparation(
+                input_ids=teacher_input_ids,
+                attention_mask=teacher_attention_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                pixel_values=user_assistant_pixel_values,
+                image_grid_thw=user_assistant_image_grid_thw,
+                pixel_values_latent=None, #teacher_pixel_values, # Ours (Latent Tokens)
+                image_grid_thw_latent=None, #teacher_image_grid_thw,  # Ours (Latent Tokens)
+                generate_mode=generate_mode,
+                latent_hidden_states=latent_hidden_states,  # Ours (Latent Tokens)
+            )    
 
-        student_output = self.forward_latent_embeds(
-            input_ids=student_input_ids,
-            attention_mask=student_attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            inputs_embeds=student_inputs_embeds,
-            labels=student_labels,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-            image_grid_thw=user_image_grid_thw,
-            video_grid_thw=video_grid_thw,
-            rope_deltas=rope_deltas,
-            cache_position=cache_position,
-            second_per_grid_ts=second_per_grid_ts,
-            generate_mode=generate_mode
-        )
-        
-
-        teacher_output = self.forward_gt_image_embeds(
-            input_ids=teacher_input_ids,
-            attention_mask=teacher_attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            inputs_embeds=teacher_inputs_embeds,
-            labels=teacher_labels,
-            use_cache=False,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-            image_grid_thw=user_assistant_image_grid_thw,
-            video_grid_thw=video_grid_thw,
-            rope_deltas=rope_deltas,
-            cache_position=cache_position,
-            second_per_grid_ts=second_per_grid_ts,
-            generate_mode=generate_mode
-        )
-        
+            output = self.forward_gt_image_embeds(
+                input_ids=teacher_input_ids,
+                attention_mask=teacher_attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=teacher_inputs_embeds,
+                labels=teacher_labels,
+                use_cache=False,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                image_grid_thw=user_assistant_image_grid_thw,
+                video_grid_thw=video_grid_thw,
+                rope_deltas=rope_deltas,
+                cache_position=cache_position,
+                second_per_grid_ts=second_per_grid_ts,
+                generate_mode=generate_mode
+            )
+            
         return Qwen2_5_VLCausalLMOutputAVT(
-            loss=student_output.loss + teacher_output.loss,
-            student_loss=student_output.loss,
-            student_logits=student_output.logits,
-            student_past_key_values=student_output.past_key_values,
-            student_hidden_states=student_output.hidden_states,
-            student_attentions=student_output.attentions,
-            student_rope_deltas=student_output.rope_deltas,
-            student_inputs_embeds=student_inputs_embeds,
-            teacher_loss=teacher_output.loss,
-            teacher_logits=teacher_output.logits,
-            teacher_past_key_values=teacher_output.past_key_values,
-            teacher_hidden_states=teacher_output.hidden_states,
-            teacher_attentions=teacher_output.attentions,
-            teacher_rope_deltas=teacher_output.rope_deltas,
-            teacher_inputs_embeds=teacher_inputs_embeds,
-            student_alignment_poss=student_alignment_poss,  # AVT
-            teacher_alignment_poss=teacher_alignment_poss,  #
-            student_image_out_mask=student_image_out_mask,  # AVT
-            teacher_image_out_mask=teacher_image_out_mask  # AVT
+            loss=output.loss,
+            logits=output.logits,
+            past_key_values=output.past_key_values,
+            hidden_states=output.hidden_states,
+            attentions=output.attentions,
+            rope_deltas=output.rope_deltas,
+            inputs_embeds=teacher_inputs_embeds if teacher_mode else student_inputs_embeds,
+            alignment_poss=teacher_alignment_poss if teacher_mode else student_alignment_poss,  #
+            image_out_mask=teacher_image_out_mask if teacher_mode else student_image_out_mask  # AVT
         )
 
     def forward_preparation(
@@ -2174,129 +2161,61 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if inputs_embeds is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
-            if pixel_values is not None:
-                pixel_values = pixel_values.type(self.visual.dtype)
-                image_embeds = self.visual(pixel_values, grid_thw=image_grid_thw)
+            
+        if pixel_values is not None:
+            pixel_values = pixel_values.type(self.visual.dtype)
+            image_embeds = self.visual(pixel_values, grid_thw=image_grid_thw)
 
-                n_image_tokens = (input_ids == self.config.image_token_id).sum().item()
+            n_image_tokens = (input_ids == self.config.image_token_id).sum().item()
+            
+            n_image_features = image_embeds.shape[0]
+
+            
+            if n_image_tokens != n_image_features:
+                assert n_image_tokens < n_image_features
+                batch_size = input_ids.shape[0]
+                hidden_states = image_embeds.shape[-1]
+
+                assert n_image_tokens % batch_size == 0
+                image_embeds = image_embeds.view(batch_size, -1, hidden_states)
+                image_embeds = image_embeds[:, :n_image_tokens // batch_size, :].contiguous()
+                image_embeds = image_embeds.view(-1, hidden_states)
                 
                 n_image_features = image_embeds.shape[0]
-
-                
                 if n_image_tokens != n_image_features:
-                    assert n_image_tokens < n_image_features
-                    batch_size = input_ids.shape[0]
-                    hidden_states = image_embeds.shape[-1]
-
-                    assert n_image_tokens % batch_size == 0
-                    image_embeds = image_embeds.view(batch_size, -1, hidden_states)
-                    image_embeds = image_embeds[:, :n_image_tokens // batch_size, :].contiguous()
-                    image_embeds = image_embeds.view(-1, hidden_states)
-                    
-                    n_image_features = image_embeds.shape[0]
-                    if n_image_tokens != n_image_features:
-                        raise ValueError(
-                            f"Image features and image tokens do not match: tokens: {n_image_tokens}, features {n_image_features}"
-                        )
-
-                mask = input_ids == self.config.image_token_id
-                
-                mask_unsqueezed = mask.unsqueeze(-1)
-                mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
-                image_mask = mask_expanded.to(inputs_embeds.device)
-
-                image_embeds = image_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
-                inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
-
-            if pixel_values_videos is not None:
-                pixel_values_videos = pixel_values_videos.type(self.visual.dtype)
-                video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
-                n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
-                n_video_features = video_embeds.shape[0]
-                if n_video_tokens != n_video_features:
                     raise ValueError(
-                        f"Video features and video tokens do not match: tokens: {n_video_tokens}, features {n_video_features}"
+                        f"Image features and image tokens do not match: tokens: {n_image_tokens}, features {n_image_features}"
                     )
 
-                mask = input_ids == self.config.video_token_id
-                mask_unsqueezed = mask.unsqueeze(-1)
-                mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
-                video_mask = mask_expanded.to(inputs_embeds.device)
-
-                video_embeds = video_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
-                inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
-
-            # compress the image embeddings of the helper images
-            if pixel_values_latent is not None:
-                pixel_values_latent = pixel_values_latent.type(self.visual.dtype)
-                latent_image_embeds = self.visual(pixel_values_latent, grid_thw=image_grid_thw_latent)
-
-                n_image_tokens = (input_ids == self.config.latent_token_id).sum().item()
-                n_image_features = latent_image_embeds.shape[0]
-
-                if n_image_tokens != n_image_features:
-                    assert n_image_tokens < n_image_features
-                    batch_size = input_ids.shape[0]
-                    hidden_states = latent_image_embeds.shape[-1]
-
-                    assert n_image_tokens % batch_size == 0
-
-                    if self.model.config.compress_strategy == "average":
-                        
-                        latent_image_embeds = latent_image_embeds.view(batch_size, -1, hidden_states)
-
-                        assert n_image_tokens // batch_size == self.model.config.latent_size
-
-                        res = latent_image_embeds.shape[1] % self.model.config.latent_size
-                        if res > 0: latent_image_embeds = latent_image_embeds[:, :-res, :]
-
-                        assert latent_image_embeds.shape[1] % self.model.config.latent_size == 0
-
-                        group_size = latent_image_embeds.shape[1] // self.model.config.latent_size
-
-                        chunks = torch.split(latent_image_embeds, group_size, dim=1)  # list of length `small_dim`
-
-                        chunk_means = [c.mean(dim=1, keepdim=True) for c in chunks]
-
-                        latent_image_embeds = torch.cat(chunk_means, dim=1).contiguous()
-
-                        latent_image_embeds = latent_image_embeds.view(-1, hidden_states)
-
-                    else: 
-                        latent_image_embeds = latent_image_embeds.view(batch_size, -1, hidden_states)
-                        latent_image_embeds = latent_image_embeds[:, :n_image_tokens // batch_size, :].contiguous()
-                        latent_image_embeds = latent_image_embeds.view(-1, hidden_states)
-
-                    n_image_features = latent_image_embeds.shape[0]
-
-                    if n_image_tokens != n_image_features:
-                        raise ValueError(
-                            f"LATENT Image features and image tokens do not match: tokens: {n_image_tokens}, features {n_image_features}"
-                        )
-
-                mask = input_ids == self.config.latent_token_id
-                
-                mask_unsqueezed = mask.unsqueeze(-1)
-                mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
-                image_mask = mask_expanded.to(inputs_embeds.device)
-
-                latent_image_embeds = latent_image_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
-                inputs_embeds = inputs_embeds.masked_scatter(image_mask, latent_image_embeds)
-
+            mask = input_ids == self.config.image_token_id
             
-            elif latent_hidden_states is not None and not generate_mode:
+            mask_unsqueezed = mask.unsqueeze(-1)
+            mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
+            image_mask = mask_expanded.to(inputs_embeds.device)
 
-                latent_mask = input_ids == self.config.latent_token_id
-                latent_mask_unsqueezed = latent_mask.unsqueeze(-1)
-                latent_mask_expanded = latent_mask_unsqueezed.expand_as(inputs_embeds)
-                latent_mask = latent_mask_expanded.to(inputs_embeds.device)
+            image_embeds = image_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
+            inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
 
-                assert latent_hidden_states.shape[0] == latent_mask.shape[0], f"Latent hidden states and mask do not match: {latent_hidden_states.shape[0]} vs {latent_mask.shape[0]}"
-                
-                inputs_embeds = inputs_embeds.masked_scatter(latent_mask, latent_hidden_states)
-            
-            if attention_mask is not None:
-                attention_mask = attention_mask.to(inputs_embeds.device)
+        if pixel_values_videos is not None:
+            pixel_values_videos = pixel_values_videos.type(self.visual.dtype)
+            video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
+            n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
+            n_video_features = video_embeds.shape[0]
+            if n_video_tokens != n_video_features:
+                raise ValueError(
+                    f"Video features and video tokens do not match: tokens: {n_video_tokens}, features {n_video_features}"
+                )
+
+            mask = input_ids == self.config.video_token_id
+            mask_unsqueezed = mask.unsqueeze(-1)
+            mask_expanded = mask_unsqueezed.expand_as(inputs_embeds)
+            video_mask = mask_expanded.to(inputs_embeds.device)
+
+            video_embeds = video_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
+            inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(inputs_embeds.device)
 
         return inputs_embeds, attention_mask, output_attentions, output_hidden_states, return_dict
 
@@ -2543,6 +2462,205 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                 rope_deltas=self.rope_deltas,
                 inputs_embeds=inputs_embeds,
             )
+
+    def forward_latent_embeds2(
+        self,
+        input_ids: torch.LongTensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        image_grid_thw: Optional[torch.LongTensor] = None,
+        video_grid_thw: Optional[torch.LongTensor] = None,
+        rope_deltas: Optional[torch.LongTensor] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        second_per_grid_ts: Optional[torch.Tensor] = None,
+        generate_mode: Optional[bool] = False,
+    ):
+        if not (self.config.stage == 'avt_stage1' and not generate_mode):
+            # 其它 stage 走原始流程
+            return self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+                labels=labels,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+
+        device      = inputs_embeds.device
+        batch_size  = input_ids.size(0)
+        seq_len     = input_ids.size(1)
+        hidden_dim  = inputs_embeds.size(-1)
+
+        # ---------- 1. 预处理：统计每条样本所有 latent 位置 ----------
+        latent_lists = []
+        for b in range(batch_size):
+            lst = (input_ids[b] == self.config.latent_token_id).nonzero(as_tuple=False).squeeze(-1).tolist()
+            latent_lists.append(lst)
+
+        # 每条样本的 “下一个 latent 索引指针”
+        ptr = [0 for _ in range(batch_size)]
+
+        # ---------- 2. 分段循环推理 ----------
+        seg_start = 0
+        kv_cache  = past_key_values
+        self.rope_deltas = None
+
+        while True:
+            # 2‑1. 还剩哪些 latent 没处理？
+            next_latent_pos = [
+                latent_lists[b][ptr[b]] if ptr[b] < len(latent_lists[b]) else None
+                for b in range(batch_size)
+            ]
+            # 所有样本都处理完 → 跳出
+            if all(p is None for p in next_latent_pos):
+                break
+
+            # 2‑2. 本段右边界 = 所有“未处理 latent”中的最小值
+            seg_end = min(p for p in next_latent_pos if p is not None)
+
+            # 2‑3. 取当前段 inputs_embeds / attention
+            curr_inputs = inputs_embeds[:, seg_start:seg_end, :]         # (B, L_seg, D)
+            curr_mask   = attention_mask[:, seg_start:seg_end]
+
+            # 2‑4. 位置编码
+            cache_position = torch.arange(seg_start, seg_end, device=device)
+            if kv_cache is None:    # 第一段：走 get_rope_index
+                pos_ids, rope_deltas = self.get_rope_index(
+                    input_ids[:, seg_start:seg_end],
+                    image_grid_thw,
+                    video_grid_thw,
+                    second_per_grid_ts,
+                    curr_mask,
+                )
+                self.rope_deltas = rope_deltas
+            else:                   # 之后段：手动平移
+                seg_len = seg_end - seg_start
+                delta = cache_position[0] + self.rope_deltas
+                if delta.dim() == 0:
+                    delta = delta.expand(batch_size)
+                elif delta.size(0) != batch_size:
+                    delta = delta.repeat(batch_size)
+
+                local_pos = torch.arange(seg_len, device=device)
+                pos_ids   = (local_pos.unsqueeze(0) + delta.unsqueeze(1))  # (B, L_seg)
+                pos_ids   = pos_ids.unsqueeze(0).expand(3, -1, -1)         # (3, B, L_seg)
+
+            # 2‑5. 调用主干模型
+            outputs = self.model(
+                input_ids=None,
+                position_ids=pos_ids,
+                attention_mask=curr_mask,
+                past_key_values=kv_cache,
+                inputs_embeds=curr_inputs,
+                use_cache=True,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                cache_position=cache_position,
+            )
+            kv_cache = outputs.past_key_values
+
+            # 2‑6. 收集“真正遇到 latent 的样本”
+            last_hidden = outputs[0][:, -1, :]          # (B, D)
+            hit_batches = [
+                b for b, pos in enumerate(next_latent_pos)
+                if pos is not None and pos == seg_end
+            ]
+            if hit_batches:
+                b_idx = torch.tensor(hit_batches, device=device, dtype=torch.long)
+                t_idx = torch.tensor(
+                    [latent_lists[b][ptr[b]] for b in hit_batches],
+                    device=device, dtype=torch.long,
+                )
+                inputs_embeds[b_idx, t_idx, :] = last_hidden[b_idx, :]
+
+                # 更新指针
+                for b in hit_batches:
+                    ptr[b] += 1
+
+            # 2‑7. 下一段
+            seg_start = seg_end
+
+        # ---------- 3. 处理所有 latent 后的尾段 ----------
+        if seg_start < seq_len:
+            cache_position = torch.arange(seg_start, seq_len, device=device)
+            seg_len        = seq_len - seg_start
+            delta = cache_position[0] + self.rope_deltas
+            if delta.dim() == 0:
+                delta = delta.expand(batch_size)
+            elif delta.size(0) != batch_size:
+                delta = delta.repeat(batch_size)
+            local_pos = torch.arange(seg_len, device=device)
+            pos_ids   = (local_pos.unsqueeze(0) + delta.unsqueeze(1))
+            pos_ids   = pos_ids.unsqueeze(0).expand(3, -1, -1)
+
+            outputs = self.model(
+                input_ids=None,
+                position_ids=pos_ids,
+                attention_mask=attention_mask[:, seg_start:],
+                past_key_values=kv_cache,
+                inputs_embeds=inputs_embeds[:, seg_start:, :],
+                use_cache=True,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+                cache_position=cache_position,
+            )
+
+            all_hidden_states.append(outputs[0])
+            all_hidden_states_all_layers = [
+                torch.cat([all_hidden_states_all_layers[i], outputs.hidden_states[i]], dim=1)
+                for i in range(len(outputs.hidden_states))
+            ]
+            kv_cache = outputs.past_key_values
+
+            hidden_states = outputs[0]
+            all_hidden_states.append(hidden_states)
+            hidden_states = torch.cat(all_hidden_states, dim=1)
+            logits = self.lm_head(hidden_states)
+            
+            all_hidden_states_all_layers = [
+                        torch.cat([all_hidden_states_all_layers[i], outputs.hidden_states[i]], dim=1)
+                        for i in range(len(outputs.hidden_states))
+                    ]
+
+            loss = None
+            if labels is not None:
+                # Upcast to float if we need to compute the loss to avoid potential precision issues
+                logits = logits.float()
+                # Shift so that tokens < n predict n
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = labels[..., 1:].contiguous()
+                # Flatten the tokens
+                loss_fct = CrossEntropyLoss()
+                shift_logits = shift_logits.view(-1, self.config.vocab_size)
+                shift_labels = shift_labels.view(-1)
+                # Enable model parallelism
+                shift_labels = shift_labels.cpu().to(shift_logits.device)
+                loss = loss_fct(shift_logits, shift_labels)
+                
+            if not return_dict:
+                output = (logits,) + outputs[1:]
+                return (loss,) + output if loss is not None else output
+
+            
+            return Qwen2_5_VLCausalLMOutputWithPast(
+                loss=loss,
+                logits=logits,
+                past_key_values=outputs.past_key_values,
+                hidden_states=all_hidden_states_all_layers,
+                attentions=outputs.attentions,
+                rope_deltas=self.rope_deltas,
+                inputs_embeds=inputs_embeds,
+            )
+
 
     def forward_gt_image_embeds(
         self,

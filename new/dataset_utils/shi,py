@@ -1,0 +1,10 @@
+import torch
+v = torch.tensor([0., 0., 0.], requires_grad=True)
+loss = v.sum()  # some loss function
+print(v.grad)
+h = v.register_hook(lambda grad: grad * 2)  # double the gradient
+loss.backward()  # compute gradients
+print(v.grad)
+
+
+h.remove()  # removes the hook

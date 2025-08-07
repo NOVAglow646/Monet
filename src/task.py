@@ -106,22 +106,37 @@ def OLD_abstract_visual_token_single_input_images_preprocess_function(sample, ad
     return merged_conversations
 
 
-def avt_single_input_images_preprocess_function(sample):
+def avt_single_input_images_preprocess_function(sample, dataset_root=""):
     """
     Preprocess function for AVT with single input images.
     """
     conversations = sample
-    dataset_root = '/fs1/home/frankyang17/qixun/dataset'
-    
+    is_VTS=False
     # Process image loading for all steps first
     for i, step in enumerate(conversations):
         new_step = step.copy()
         if step["role"] == "system":
             new_step["content"][0]["text"] = "You are a helpful assistant."
         for j, content in enumerate(new_step["content"]):
+            if new_step["role"] == "assistant" and is_VTS:
+                if j==len(new_step["content"])-1:
+                    if content["type"] == "image":
+                        continue
+                if j==len(new_step["content"])-2:
+                    if content["type"] == "text" and new_step["content"][j+1]["type"] == "image":
+                        s = content["text"].find("<abs_vis_token></abs_vis_token>")
+                        lat = content["text"][s+len("<abs_vis_token></abs_vis_token>"):].replace("<observation>","").replace("</observation>","") if s!=-1 else ""
+                        prev = content["text"][:s] if s!=-1 else content["text"]
+                        content["text"] = prev + lat
+                        
             if content["type"] == "image":
-                content["image"] = os.path.join(dataset_root,content.pop("image_file_name")) #Image.open((Path(dataset_root)/content.pop("image_file_name")).resolve()).convert("RGB") #  Image.open('/fs1/home/frankyang17/qixun/code/abstract-visual-token/data/images/level_6/23/map_6x6_step_0.png').convert("RGB") # 
-                #print(content["image"].size)
+                if "VTS" in content["image_file_name"]:
+                    is_VTS=True
+                content["image"] = os.path.join(dataset_root,content.pop("image_file_name")) 
+                if j>0 and new_step["content"][j-1]["type"] == "text" and step["role"] == "assistant":
+                    if "<abs_vis_token></abs_vis_token>" not in new_step["content"][j-1]["text"]:
+                        new_step["content"][j-1]["text"] += "<abs_vis_token></abs_vis_token>"
+            
             new_step["content"][j] = content
         conversations[i] = new_step
     
@@ -158,6 +173,7 @@ def abstract_visual_token_multiple_input_images_preprocess_function(sample):
     ]
 
     return conversations
+
 
 
 task_preporcess_config = {

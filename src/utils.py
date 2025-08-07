@@ -18,20 +18,25 @@ def get_args():
     parser.add_argument("--task", type=str, default="vsp-spatial-reasoning", choices=["vsp-spatial-reasoning", "vsp-spatial-planning", "blink-jigsaw", "sat", "mm-reasoning"])
 
     parser.add_argument("--latent_size", type=int, default=4)
+    parser.add_argument("--min_latent_size", type=int, default=6, help="AVT minimum latent size")
+    parser.add_argument("--min_latent_compress_factor", type=int, default=10, help="the minimum of the range of the AVT compress factor")
+    parser.add_argument("--max_latent_compress_factor", type=int, default=20, help="the maximum of the range of the AVT compress factor")
     parser.add_argument("--compress_strategy", type=str, default='average', choices=['average'])
-    
+    parser.add_argument("--bsz", type=int, default=1, help="Batch size for training.")
+    parser.add_argument("--grad_accum_steps", type=int, default=4, help="Gradient accumulation steps.")
     parser.add_argument("--epochs", type=int, default=10)   
-    
+    parser.add_argument("--shuffle_train", action='store_true', default=False, help="Whether to shuffle the training dataset.")
     parser.add_argument("--data_path", type=str, default='PathToJsonlData', nargs='+')    
     parser.add_argument("--log_file", type=str, default='./log.txt')
     
     parser.add_argument("--save_model_path", type=str, default='./checkpoints/model_stage1')
     parser.add_argument("--load_model_path", type=str, default='./checkpoints/model_stage1')
 
-    parser.add_argument("--devices", type=str, nargs='+', default=['cuda:0'])
+    #parser.add_argument("--devices", type=str, nargs='+', default=['cuda:0'])
 
     parser.add_argument("--add_reflection", action='store_true', default=False, help="Whether to add reflection in the assistant's response.")
-    parser.add_argument("--alignment", type=str, default="observation_end", choices=["observation_end", "boxed_start"], help="The alignment strategy for AVT.")
+    parser.add_argument("--alignment", type=str, default="observation_end", choices=["observation_end", "boxed_start", "observation_all"], help="The alignment strategy for AVT.")
+    parser.add_argument("--dataset_root", type=str, default="./new", help="Root directory for the dataset.")
     return parser.parse_args()
 
 def seed_everything(seed: int = 42):
@@ -246,7 +251,9 @@ def process_batch(
     start_token: int,
     end_token: int,
     replacement_token: int,
-    replacement_length: int,
+    min_latent_size: int,
+    min_latent_compress_factor: int = 10,
+    max_latent_compress_factor: int = 20,
     pad_token: int = 0,
     batch_assistant_img_token_lens: List[int] = None
 ):
@@ -257,12 +264,12 @@ def process_batch(
     processed_sequences = []
 
     if batch_assistant_img_token_lens is not None:
-        batch_compress_ratio = [random.randint(50, 200) for _ in range(batch_size)]
+        batch_compress_ratio = [random.randint(min_latent_compress_factor, max_latent_compress_factor) for _ in range(batch_size)]
         batch_compressed_img_token_lens = []
         for b in range(batch_size):
             compressed_lengths = []
             for img_len in batch_assistant_img_token_lens[b]:
-                compressed_length = img_len // batch_compress_ratio[b] if img_len // batch_compress_ratio[b] > 4 else 4
+                compressed_length = img_len // batch_compress_ratio[b] if img_len // batch_compress_ratio[b] > min_latent_size else min_latent_size
                 compressed_lengths.append(compressed_length)
             batch_compressed_img_token_lens.append(compressed_lengths)
 
@@ -508,8 +515,8 @@ def mask_image_output_tokens(
 
 
 def resize_by_token_budget(images,
-                           global_max_pixels=2500*28*28,
-                           per_img_max_pixels=800*28*28,
+                           global_max_pixels=1280*3*28*28,
+                           per_img_max_pixels=1280*28*28,
                            divisor=28):
     """等比缩放，保证一条样本内所有图像像素和 ≤ global_max_pixels"""
     # 1) 统计原总像素

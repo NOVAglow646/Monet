@@ -64,6 +64,8 @@ from AAA_vllm_toolkit.extract_and_check import (
     quick_batch_judge,
     llm_batch_judge,
     extract_html_answer,
+    llm_batch_extract,
+    data_spec_batch_judge
 )
 
 from transformers import AutoProcessor, AutoTokenizer  # trust_remote_code needed
@@ -73,40 +75,40 @@ from transformers import AutoProcessor, AutoTokenizer  # trust_remote_code neede
 # =============================
 DEFAULT_DATASETS = {
     "PixelReasoner": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/PixelReasoner-SFT-Data/processed_data.json",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/PixelReasoner-SFT-Data",
+        "dataset_path": "/home/dids/shiyang/datasets/PixelReasoner-SFT-Data/processed_data.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/PixelReasoner-SFT-Data",
     },
     "CoM_w_MathVista": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/CoMDataset/com_math_processed.jsonl",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/CoMDataset",
+        "dataset_path": "/home/dids/shiyang/datasets/CoMDataset/com_math_processed.jsonl",
+        "dataset_images_root": "/home/dids/shiyang/datasets/CoMDataset",
     },
     "CoM_wo_MathVista": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/CoMDataset/com_math_processed.jsonl",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/CoMDataset",
+        "dataset_path": "/home/dids/shiyang/datasets/CoMDataset/com_math_processed.jsonl",
+        "dataset_images_root": "/home/dids/shiyang/datasets/CoMDataset",
     },
     "CoF": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/CoF-SFT-Data-5.4k/cof_sft_data.json",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/CoF-SFT-Data-5.4k",
+        "dataset_path": "/home/dids/shiyang/datasets/CoF-SFT-Data-5.4k/cof_sft_data.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/CoF-SFT-Data-5.4k",
     },
     "vigorl_spatial_reasoning": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/vigorl_datasets/spatial_reasoning/MCTS_72b_reasoning_chains_train.json",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/vigorl_datasets",
+        "dataset_path": "/home/dids/shiyang/datasets/vigorl_datasets/spatial_reasoning/MCTS_72b_reasoning_chains_train.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/vigorl_datasets",
     },
     "ReFocus": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/ReFocus_Data/train_raw_data/chartqa_vcot/train.jsonl",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/ReFocus_Data",
+        "dataset_path": "/home/dids/shiyang/datasets/ReFocus_Data/train_raw_data/chartqa_vcot/train.jsonl",
+        "dataset_images_root": "/home/dids/shiyang/datasets/ReFocus_Data",
     },
     "Visual_CoT_v7w": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/Visual-CoT/metadata/visual7w_cot_train.jsonl",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/Visual-CoT",
+        "dataset_path": "/home/dids/shiyang/datasets/Visual-CoT/metadata/visual7w_cot_train.jsonl",
+        "dataset_images_root": "/home/dids/shiyang/datasets/Visual-CoT",
     },
     "Visual_CoT_gqa": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/Visual-CoT/metadata/gqa_cot_train.jsonl",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/Visual-CoT",
+        "dataset_path": "/home/dids/shiyang/datasets/Visual-CoT/metadata/gqa_cot_train.jsonl",
+        "dataset_images_root": "/home/dids/shiyang/datasets/Visual-CoT",
     },
     "VTS": {
-        "dataset_path": "/data1/qxwang/datasets/multimodal/VTS/vts_train.jsonl",
-        "dataset_images_root": "/data1/qxwang/datasets/multimodal/VTS",
+        "dataset_path": "/home/dids/shiyang/datasets/VTS/vts_train.jsonl",
+        "dataset_images_root": "/home/dids/shiyang/datasets/VTS",
     },
     "Zebra_CoT_visual_search": {
         "dataset_path": "/home/dids/shiyang/datasets/Zebra-CoT/2D Visual Reasoning - Visual Search",
@@ -124,6 +126,26 @@ DEFAULT_DATASETS = {
         "dataset_path": "/home/dids/shiyang/datasets/Zebra-CoT/Visual Logic & Strategic Games - Maze",
         "dataset_images_root": "",
     },
+    "Zebra_CoT_count": {
+        "dataset_path": "/home/dids/shiyang/datasets/Zebra-CoT/3D Visual Reasoning - Multi-Hop Objects Counting",
+        "dataset_images_root": "",
+    },
+    "VTS_1": {
+        "dataset_path": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT/VTS_SFT_315k.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT",
+    },
+    "VTS_2": {
+        "dataset_path": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT/VTS_SFT_315k.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT",
+    },
+    "VTS_3": {
+        "dataset_path": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT/VTS_SFT_315k.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT",
+    },
+    "VTS_4": {
+        "dataset_path": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT/VTS_SFT_315k.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/VTS_SFT_Data/VTS_SFT",
+    }
 }
 
 
@@ -551,6 +573,7 @@ def parse_cof(
 
         gt = extract_html_answer(text)
         bbox, resp_wo_tool = _get_bbox_and_rmv_tool(step["content"])
+        helper_img = None
         if bbox is not None:
             typ = "crop"
             helper_img = Image.open(
@@ -594,15 +617,6 @@ def parse_cof(
 def parse_refocus(
     sample: Dict[str, Any], dataset_images_root: Path
 ) -> Optional[Dict[str, Any]]:
-    def _format_answer(step: str):
-        step = step
-        answer_match = re.search(r"FINAL ANSWER:\s*(.*?)(?:\.|$)", step, re.IGNORECASE)
-        if answer_match:
-            answer = answer_match.group(1).strip()
-            return step.replace(answer_match.group(0), f"\\boxed{{{answer}}}").replace(
-                "ANSWER: ", ""
-            )
-        return step
 
     def _remove_action_and_code_format(step: str) -> str:
         # 移除代码块
@@ -631,7 +645,7 @@ def parse_refocus(
     for i, step in enumerate(cot):
         raw_step = step
         formatted_step = _remove_thought_format(
-            _remove_action_and_code_format(_format_answer(raw_step))
+            _remove_action_and_code_format(raw_step)
         )
         helper_img = None
         if "<abs_vis_token></abs_vis_token>" in formatted_step:
@@ -791,7 +805,7 @@ def parse_zebra_cot(
 
     def _replace_img_pad(step: str):
         return re.sub(
-            r"<image_start>\[reasoning_image_\d+\]<image_end>",
+            r"<image_start>\[(reasoning_image_\d+|problem_image_\d+)]<image_end>",
             "<abs_vis_token></abs_vis_token>",
             step,
         )
@@ -833,10 +847,110 @@ def parse_zebra_cot(
     }
 
 
-# ============================================================
-# conversation 构造（policy round，仅主图+问题）
-# ============================================================
+def parse_vts(
+    sample: Dict[str, Any], dataset_images_root: Path
+) -> Optional[Dict[str, Any]]:
+    # remove this helper step
+    "The bounding box coordinates are:"
+    "Here's the depth map:"
+    "However, no image was returned"
+    "Here's the segmented image:"
+    "Here's the cropped image:"
+    "Here's the overlayed image:"
+    
+    # process
+    "Extracted text: Pumpkins sold, Day, Number of pumpkins, Friday, 84, Saturday, Sunday, Monday\n<image>"
+    
+    # discard this sample
+    "Similarity scores:"
+    
+    # w_choice
+    "<image>what vehicle is it?\nChoices:\nA. Car.\nB. Bicycle.\nC. Truck.\nD. Boat.\nAnswer with the option's letter from the given choices directly."
+    
+    helpers = []
+    messages = sample["messages"]
+    images = sample["images"]
+    question = messages[1]["content"].replace("<image>", "").strip()
+    main_img = Image.open(
+        dataset_images_root / images[0]
+    ).convert("RGB")
+    if "Choices" in question:
+        question = add_boxed_instruction(question, allow_None=False, mode="multi_choice")
+    else:
+        question = add_boxed_instruction(question, allow_None=False, mode="normal")        
 
+    img_ptr = 1
+    cot_step_id = 0
+    total_messages = len(messages)
+    for i, msg in enumerate(messages):
+        if msg["role"] == "system" or msg["role"] == "user":
+            continue
+        if i==1:
+            continue
+        if msg["role"] == "assistant":
+            content_dict = json.loads(msg["content"])
+            if not isinstance(content_dict, dict): # invalid helper content
+                print("[VTS] invalid helper content, discard this sample")
+                return None
+            add_use_content_as_next_helper_step = False
+            if i+1 < total_messages and messages[i+1]["role"] == "user":
+                user_content = messages[i+1]["content"]
+                if "Similarity scores:" in user_content:
+                    print("[VTS] Similarity scores found, discard this sample")
+                    return None
+                if "Extracted text:" in user_content:
+                    user_content = user_content.replace("<image>", "")
+                    add_use_content_as_next_helper_step = True
+                user_img_cnt = messages[i+1]["content"].count("<image>")
+                if user_img_cnt == 0:
+                    helper_img = None 
+                else:
+                    user_content = messages[i+1]["content"].replace("Here's the original image: <image>", "")
+                    if user_content.count("<image>") > 1: # multiple images in a helper step, discard
+                        print("[VTS] multiple images in a helper step, discard")
+                        return None
+                    if user_img_cnt == 0:
+                        helper_img = None
+                    else:
+                        helper_img = Image.open(
+                            dataset_images_root / images[img_ptr]
+                        ).convert("RGB")
+                    img_ptr += user_img_cnt
+            
+            step_text = content_dict["thought"]
+            if helper_img is not None:
+                step_text += " <abs_vis_token></abs_vis_token>"
+            if add_use_content_as_next_helper_step:
+                step_text += f" {user_content}"
+            gt_answer_text = content_dict["action"].get("final_response", "")   
+            if not isinstance(gt_answer_text, str):   # invalid answer (not str)
+                print("[VTS] invalid answer, discard this sample")
+                return None
+            if "yes" in gt_answer_text.lower() or "no" in gt_answer_text.lower(): # drop yes/no answers
+                print("[VTS] yes/no answer found, discard this sample")
+                return None
+            if gt_answer_text != "":
+                step_text += f" The final answer is: {gt_answer_text}"
+
+            helpers.append(
+                {
+                    "step_idx": cot_step_id,
+                    "text": step_text,
+                    "image": helper_img,
+                    "type": "any"        
+                }
+            )
+            helper_img = None
+            cot_step_id += 1
+            
+    return {
+        "qid": None,
+        "question": question,
+        "gt_choices": None,
+        "gt_answer_text": gt_answer_text,
+        "main_image": main_img,
+        "helpers": helpers,
+    }
 
 def build_policy_conversation(question: str, pil_img: Image.Image) -> Dict[str, Any]:
     return [
@@ -890,7 +1004,7 @@ def run_policy_batch(
     processor,
     tokenizer,
     max_model_len: Optional[int],
-    batch_size: int = 4096,
+    batch_size: int = 8192,
 ) -> Tuple[List[Optional[str]], List[Optional[str]], List[bool]]:
 
     if vllm_mllm_process_batch_from_messages is None:
@@ -1005,6 +1119,7 @@ def main():
         default=2,
         help="policy_mllm 模型的 tensor parallel size",
     )
+    parser.add_argument("--judge_mode", choices=["llm", "quick", "data_spec"], nargs="+")
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
@@ -1049,6 +1164,15 @@ def main():
     elif ds_cfg["dataset_path"].endswith(".json"):
         with open(dataset_path, "r", encoding="utf-8") as f:
             samples = json.load(f)
+        if "VTS" in args.dataset_name:
+            total = len(samples)
+            quarter_cnt = total // 4
+            split_num = int(args.dataset_name.split("_")[-1])
+            if split_num < 1 or split_num > 4:
+                raise ValueError("split_num must be between 1 and 4")
+            start_idx = (split_num - 1) * quarter_cnt
+            end_idx = split_num * quarter_cnt
+            samples = samples[start_idx:end_idx]
     else:
         if "Zebra_CoT" in args.dataset_name:
             data_root = ds_cfg["dataset_path"]
@@ -1094,6 +1218,8 @@ def main():
             )
         elif "Zebra_CoT" in args.dataset_name:
             rec = parse_zebra_cot(samp, dataset_images_root)
+        elif "VTS" in args.dataset_name:
+            rec = parse_vts(samp, dataset_images_root)
         if rec is None:
             continue
         rec["orig_idx"] = idx
@@ -1123,21 +1249,34 @@ def main():
     gts = [r["gt_answer_text"] for r in parsed_recs]
     choices_list = [r["gt_choices"] for r in parsed_recs]
 
-    # use batch_judge
-    if args.judge_llm_dir is not None:
+    
+    llm_judged = [0]*len(extr_outs)  
+    quick_judged = [0]*len(extr_outs)  
+    data_spec_judged = [0]*len(extr_outs)  
+    
+    if "llm" in args.judge_mode:
         judge_llm, _ = vllm_llm_init(
             args.judge_llm_dir, tp=args.judge_llm_tensor_parallel_size
         )
-        judged = llm_batch_judge(
-            extr_outs,
-            gts,
-            judge_llm,
-            questions=questions if len(questions) > 0 else None,
-        )
-    else:
-        # judged = batch_judge(extr_outs, gts, choices_list, llm=judge_llm, questions=questions if len(questions)>0 else None)
-        judged = quick_batch_judge(extr_outs, gts, gt_choices=choices_list)
+        
+        questions_wo_inst = [question.replace("Put the letter of your choice within \\boxed{}.", "").replace("Put your final answer within \\boxed{}.", "") for question in questions]
+        if "VTS" in args.dataset_name:
+            gts_extracted = llm_batch_extract(gts, judge_llm, questions=questions_wo_inst if len(questions_wo_inst) > 0 else None, dataset_name="VTS")
 
+        llm_judged = llm_batch_judge(
+            extr_outs,
+            gts_extracted,
+            judge_llm,
+            questions=questions_wo_inst if len(questions_wo_inst) > 0 else None,
+        )
+    if "quick" in args.judge_mode:
+        # judged = batch_judge(extr_outs, gts, choices_list, llm=judge_llm, questions=questions_wo_inst if len(questions_wo_inst)>0 else None)
+        quick_judged = quick_batch_judge(extr_outs, gts)
+    if "data_spec" in args.judge_mode:
+        data_spec_judged = data_spec_batch_judge(extr_outs, gts, args.dataset_name)
+        
+    judged = [llm or quick or data_spec for llm, quick, data_spec in zip(llm_judged, quick_judged, data_spec_judged)]
+        
     sid = args.start_id
     kept = 0
     skipped_policy_correct = 0

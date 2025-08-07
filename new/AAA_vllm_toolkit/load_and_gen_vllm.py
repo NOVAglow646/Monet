@@ -19,7 +19,7 @@ from PIL import Image
 # quick setup of the parameters
 # model setup
 max_model_len = 8192
-max_num_seqs = 1021 # processing speed
+max_num_seqs = 1024 # processing speed
 #tp = 4
 temperature = 0.1
 top_k = 50
@@ -27,11 +27,11 @@ top_p = 0.8
 repetition_penalty = 1.01
 best_of = 1
 n_generate_sample = best_of
-max_tokens = 2048
+max_tokens = 4096
 swap_space = 7
 seed = 0
 stop = None
-gpu_memory_utilization = 0.8
+
 qwen_series = ["Qwen2.5-VL-7B", "Qwen2-VL-7B", "ThinkLite-VL-7B", "Vision-R1", "qwen", "VL-Rethinker-7B"]
 max_pixels = 1280*28*28
 min_pixels = 256*28*28
@@ -43,7 +43,7 @@ qwen_instruct_prompt = "\n\nPlease reason step by step, and put your final answe
 ####################################################################################################################
 
 
-def vllm_mllm_init(mllm_dir, tp=4):
+def vllm_mllm_init(mllm_dir, tp=4, gpu_memory_utilization=0.8):
 
     engine_args = EngineArgs(
         model=mllm_dir,
@@ -280,7 +280,8 @@ def resize_by_token_budget(images,
 ##########################################################################################
 
 
-def vllm_llm_init(llm_dir, tp=4):
+def vllm_llm_init(llm_dir, tp=4, gpu_memory_utilization=0.8, temperature=0.2,
+                  max_model_len=8192):
     llm = LLM(
         model=llm_dir, 
         tensor_parallel_size=tp, 

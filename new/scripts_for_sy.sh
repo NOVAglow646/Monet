@@ -12,9 +12,9 @@ python -m dataset_utils.stage1 \
   --dataset-name Zebra_CoT_geometry \
   --policy-model-path /ytech_m2v5_hdd/workspace/kling_mm/Models/Qwen2.5-VL-7B-Instruct \
   --policy_mllm_tensor_parallel_size 2 \
-  --devices 0,1,2,3,4,5,6,7 \
+  --devices 0,1 \
   --judge_llm_dir /pfs/Models/Qwen2.5-32B-Instruct \
-  --judge_llm_tensor_parallel_size 4
+  --judge_llm_tensor_parallel_size 2
   #--limit 200
 
 
@@ -27,11 +27,11 @@ python -m dataset_utils.stage2 \
   --stage1 ./created_dataset/filtered_data/Zebra_CoT_geometry/stage1_policy_out.jsonl \
   --out    ./created_dataset/filtered_data/Zebra_CoT_geometry/stage2_strong_out.jsonl \
   --model-path /pfs/Models/Qwen2.5-VL-32B-Instruct \
-  --strong_mllm_tensor_parallel_size 4 \
-  --devices 0,1,2,3,4,5,6,7 \
+  --strong_mllm_tensor_parallel_size 2 \
+  --devices 0,1 \
   --token-limit 8192 \
   --judge_llm_dir /pfs/Models/Qwen2.5-32B-Instruct \
-  --judge_llm_tensor_parallel_size 4 \
+  --judge_llm_tensor_parallel_size 2 \
   --max-batch 2048 
 
 # stage 3
@@ -56,9 +56,9 @@ python -m dataset_utils.stage1 \
   --dataset-name Zebra_CoT_physics \
   --policy-model-path /ytech_m2v5_hdd/workspace/kling_mm/Models/Qwen2.5-VL-7B-Instruct \
   --policy_mllm_tensor_parallel_size 2 \
-  --devices 0,1,2,3,4,5,6,7 \
+  --devices 2,3 \
   --judge_llm_dir /pfs/Models/Qwen2.5-32B-Instruct \
-  --judge_llm_tensor_parallel_size 4
+  --judge_llm_tensor_parallel_size 2
   #--limit 200
 
 # stage 2
@@ -69,11 +69,11 @@ python -m dataset_utils.stage2 \
   --stage1 ./created_dataset/filtered_data/Zebra_CoT_physics/stage1_policy_out.jsonl \
   --out    ./created_dataset/filtered_data/Zebra_CoT_physics/stage2_strong_out.jsonl \
   --model-path /pfs/Models/Qwen2.5-VL-32B-Instruct \
-  --strong_mllm_tensor_parallel_size 4 \
-  --devices 0,1,2,3,4,5,6,7 \
+  --strong_mllm_tensor_parallel_size 2 \
+  --devices 2,3 \
   --token-limit 8192 \
   --judge_llm_dir /pfs/Models/Qwen2.5-32B-Instruct \
-  --judge_llm_tensor_parallel_size 4 \
+  --judge_llm_tensor_parallel_size 2 \
   --max-batch 4096 
   #--max-samples 200 
 
@@ -98,9 +98,9 @@ python -m dataset_utils.stage1 \
   --dataset-name Zebra_CoT_maze \
   --policy-model-path /ytech_m2v5_hdd/workspace/kling_mm/Models/Qwen2.5-VL-7B-Instruct \
   --policy_mllm_tensor_parallel_size 2 \
-  --devices 0,1,2,3,4,5,6,7 \
+  --devices 4,5 \
   --judge_llm_dir /pfs/Models/Qwen2.5-32B-Instruct \
-  --judge_llm_tensor_parallel_size 4
+  --judge_llm_tensor_parallel_size 2
   #--limit 200
 
 # stage 2
@@ -111,11 +111,11 @@ python -m dataset_utils.stage2 \
   --stage1 ./created_dataset/filtered_data/Zebra_CoT_maze/stage1_policy_out.jsonl \
   --out    ./created_dataset/filtered_data/Zebra_CoT_maze/stage2_strong_out.jsonl \
   --model-path /pfs/Models/Qwen2.5-VL-32B-Instruct \
-  --strong_mllm_tensor_parallel_size 4 \
-  --devices 0,1,2,3,4,5,6,7 \
+  --strong_mllm_tensor_parallel_size 2 \
+  --devices 4,5 \
   --token-limit 8192 \
   --judge_llm_dir /pfs/Models/Qwen2.5-32B-Instruct \
-  --judge_llm_tensor_parallel_size 4 \
+  --judge_llm_tensor_parallel_size 2 \
   --max-batch 4096
   #--max-samples 200 
 
