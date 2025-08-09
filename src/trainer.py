@@ -173,7 +173,8 @@ class CustomTrainerSFT(SFTTrainer):
             self.rep_analyzer = SFTRepAnalyzer(
                 save_dir=args_cfg.sft_analysis_save_dir,
                 categories=args_cfg.sft_analysis_categories,
-                save_baseline=args_cfg.sft_analysis_save_baseline
+                save_baseline=args_cfg.sft_analysis_save_baseline,
+                dataset_names=self.args.dataset_names
             )
             if getattr(self, 'is_main_process', True):
                 logging.info(f"[SFT Analysis] Analyzer initialized. Save dir={args_cfg.sft_analysis_save_dir}; Categories={args_cfg.sft_analysis_categories}; Save baseline={args_cfg.sft_analysis_save_baseline}")

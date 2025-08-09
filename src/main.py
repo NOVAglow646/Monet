@@ -400,11 +400,14 @@ else:
 exp_name = f"ep{args.epochs}-bsz{args.bsz}-lr{1e-5}-{args.min_latent_size}-{args.min_latent_compress_factor}-{args.max_latent_compress_factor}"
 if args.stage in ["avt_stage1"]:
     exp_name = f"{args.alignment}-" + exp_name
+exp_name = args.stage+exp_name
 if args.shuffle_train:
     exp_name += "-shuffle"
+dataset_names = ""
 for data_path in args.data_path:
     dataset_name = data_path.split("/")[-2]
-    exp_name += f"-{dataset_name}"
+    dataset_names += f"-{dataset_name}"
+dataset_name += dataset_names
 save_dir = f"./checkpoints/{exp_name}"
 
 if args.stage in ['stage1']:
@@ -439,7 +442,7 @@ training_args = SFTConfig(
     gradient_checkpointing=False if "avt" in args.stage else True,
     dataset_text_field="",
     dataset_kwargs={"skip_prepare_dataset": True},
-    report_to=['wandb'],
+    report_to=[],
     logging_dir='./logs/',
     logging_strategy='steps',
 )
@@ -450,6 +453,7 @@ if args.stage == 'avt_sft':
     setattr(training_args, 'sft_analysis_save_dir', args.sft_analysis_save_dir)
     setattr(training_args, 'sft_analysis_categories', args.sft_analysis_categories)
     setattr(training_args, 'sft_analysis_save_baseline', args.sft_analysis_save_baseline)
+    setattr(training_args, 'dataset_names', dataset_names)
 
 # Initialize the trainer (callbacks that need trainer instance will be added after)
 trainer = CustomTrainer(

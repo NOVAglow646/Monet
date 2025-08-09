@@ -28,8 +28,6 @@ def get_args():
     parser.add_argument("--shuffle_train", action='store_true', default=False, help="Whether to shuffle the training dataset.")
     parser.add_argument("--data_path", type=str, default='PathToJsonlData', nargs='+')    
     parser.add_argument("--log_file", type=str, default='./log.txt')
-    
-    parser.add_argument("--save_model_path", type=str, default='./checkpoints/model_stage1')
     parser.add_argument("--load_model_path", type=str, default='./checkpoints/model_stage1')
 
     #parser.add_argument("--devices", type=str, nargs='+', default=['cuda:0'])
@@ -44,7 +42,7 @@ def get_args():
                         help="Proportion (0~1] of the whole training dataset to sample for representation analysis. Ignored if disable.")
     parser.add_argument("--sft_analysis_seed", type=int, default=1234,
                         help="Random seed for sampling analysis subset.")
-    parser.add_argument("--sft_analysis_max_samples", type=int, default=500,
+    parser.add_argument("--sft_analysis_max_samples", type=int, default=2000,
                         help="Maximum number of samples to track even if ratio yields more.")
     parser.add_argument("--sft_analysis_save_dir", type=str, default="./sft_analysis",
                         help="Directory to save analysis artifacts (subset ids, per-epoch cosine stats).")
@@ -648,11 +646,13 @@ class SFTRepAnalyzer:
     def __init__(self,
                  save_dir: str,
                  categories: List[str],
-                 save_baseline: bool = False):
+                 save_baseline: bool = False,
+                 dataset_names: str = ""):
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self.categories = categories
         self.save_baseline_flag = save_baseline
+        self.dataset_names = dataset_names
         self.subset_ids: List[int] = []
         self.baseline: dict[int, torch.Tensor] = {}  # id -> (num_layers, seq, hidden)
         self.layer_count: int = 0
@@ -739,7 +739,7 @@ class SFTRepAnalyzer:
                 summary[f'{cat}_layer_mean_avg'] = [v/count for v in layer_accumulator]
         summary['num_samples_with_cat'] = {cat: sum(1 for rec in samples if f'{cat}_layer_mean' in rec) for cat in self.categories}
         out = {'epoch': epoch, 'summary': summary, 'samples': samples}
-        out_path = os.path.join(self.save_dir, f'epoch_{epoch}_rep_analysis.json')
+        out_path = os.path.join(self.save_dir, f'epoch_{epoch}_rep_analysis{self.dataset_names}.json')
         with open(out_path, 'w') as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
         logging.info(f"[SFT Analysis] Saved epoch {epoch} rep analysis to {out_path}; samples={len(samples)}")

@@ -86,8 +86,8 @@ def plot_heatmap(ax, mat: np.ndarray, title: str, epochs: List[int], *, cmap: st
 
 def main():
     parser = argparse.ArgumentParser(description="Plot representation similarity heatmaps across epochs and layers.")
-    parser.add_argument("--dir", required=True, help="Directory containing epoch_*_rep_analysis.json files")
-    parser.add_argument("--out", default=None, help="Output image path. Default: <dir>/rep_heatmaps.png")
+    parser.add_argument("--dir", help="Directory containing epoch_*_rep_analysis.json files", default="./sft_analysis")
+    parser.add_argument("--out", help="Output image path. Default: <dir>/rep_heatmaps.png", default="./sft_analysis/plot_imgs/Zebra_CoT_visual_search.jpg")
     parser.add_argument("--cats", nargs="*", default=["observation_poss", "non_observation_poss"],
                         help="Categories to plot (must match *_layer_mean_avg keys in summaries)")
     args = parser.parse_args()
@@ -149,3 +149,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # python ./src/plot_rep.py
