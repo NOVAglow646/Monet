@@ -528,8 +528,8 @@ def mask_image_output_tokens(
 
 
 def resize_by_token_budget(images,
-                           global_max_pixels=1280*3*28*28,
-                           per_img_max_pixels=1280*28*28,
+                           global_max_pixels=640*3*28*28,
+                           per_img_max_pixels=640*28*28,
                            divisor=28):
     """等比缩放，保证一条样本内所有图像像素和 ≤ global_max_pixels"""
     # 1) 统计原总像素
@@ -561,8 +561,8 @@ def resize_by_token_budget(images,
 
 
 def resize_by_token_budget_sample_wise(images_per_sample,
-                                       global_max_pixels=1280*3*28*28,
-                                       per_img_max_pixels=1280*28*28,
+                                       global_max_pixels=320*3*28*28,
+                                       per_img_max_pixels=320*28*28,
                                        divisor=28):
     """逐样本等比缩放，每个样本单独满足像素预算。
 

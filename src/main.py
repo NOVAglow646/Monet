@@ -1,9 +1,12 @@
+import os as _early_os
+# Disable parallelism in HuggingFace tokenizers to avoid fork-related warnings/deadlocks
+_early_os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 from functools import partial
 import torch
 from new.avt_qwen_model import apply_qwen2_5_avt
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLConfig, AutoTokenizer, AutoProcessor
 from PIL import Image
-import os
 import logging
 from tqdm import tqdm
 from trl import SFTTrainer, SFTConfig
@@ -18,14 +21,16 @@ import random
 seed_everything(seed=42)
 args=get_args()
 
+# DDP-friendly logging: only rank0 writes file
+_rank = int(os.environ.get("RANK", os.environ.get("LOCAL_RANK", "0")))
+_handlers = [logging.StreamHandler()]
+if _rank == 0 and getattr(args, 'log_file', None):
+    _handlers.insert(0, logging.FileHandler(args.log_file, mode='a', encoding='utf-8'))
 logging.basicConfig(
-    level=logging.INFO,  # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
-    datefmt='%Y-%m-%d %H:%M:%S',  # Date format
-    handlers=[
-        logging.FileHandler(args.log_file, mode='a', encoding='utf-8'),
-        logging.StreamHandler()
-    ],
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=_handlers,
 )
 
 logging.info('=='*20)
@@ -58,8 +63,19 @@ config.stage = args.stage
 if args.stage in ['stage1', 'avt_stage1'] or (args.stage == 'avt_sft' and args.sft_analysis_enable):
     config.output_hidden_states = True
 
+# Prefer Trainer-managed device placement (DDP/Accelerate). Avoid device_map="auto" here.
+# Enable TF32 for faster matmul on Ampere+ if available.
+try:
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+except Exception:
+    pass
 
-model = Qwen2_5_VLForConditionalGeneration.from_pretrained(args.load_model_path, config=config, device_map="auto", torch_dtype=torch.bfloat16)
+model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    args.load_model_path,
+    config=config,
+    torch_dtype=torch.bfloat16,
+)
 
 if args.stage in ['stage1']: model.resize_token_embeddings(len(processor.tokenizer))
 
@@ -400,7 +416,7 @@ else:
 exp_name = f"ep{args.epochs}-bsz{args.bsz}-lr{1e-5}-{args.min_latent_size}-{args.min_latent_compress_factor}-{args.max_latent_compress_factor}"
 if args.stage in ["avt_stage1"]:
     exp_name = f"{args.alignment}-" + exp_name
-exp_name = args.stage+exp_name
+exp_name = args.stage+'-'+exp_name
 if args.shuffle_train:
     exp_name += "-shuffle"
 dataset_names = ""
@@ -439,12 +455,17 @@ training_args = SFTConfig(
     bf16=True,
     push_to_hub=False,
     remove_unused_columns=False,
-    gradient_checkpointing=False if "avt" in args.stage else True,
+    gradient_checkpointing=False if args.stage == "avt_stage1" else True,
     dataset_text_field="",
     dataset_kwargs={"skip_prepare_dataset": True},
     report_to=[],
     logging_dir='./logs/',
     logging_strategy='steps',
+    # DDP related
+    ddp_backend="nccl",
+    ddp_find_unused_parameters=False,
+    dataloader_num_workers=4,
+    dataloader_pin_memory=True,
 )
 
 # ---- Inject custom SFT analysis flags into training_args so CustomTrainerSFT can access them ----
@@ -470,14 +491,15 @@ if args.stage=='avt_sft' and getattr(args, 'sft_analysis_enable', False):
     from src.trainer import RepSummaryCallback
     trainer.add_callback(RepSummaryCallback(trainer))
 
-# Build baseline hidden states for SFT analysis subset before training
-if args.stage=='avt_sft' and getattr(args, 'sft_analysis_enable', False):
+# Build baseline hidden states for SFT analysis subset before training (rank0 only)
+if args.stage=='avt_sft' and getattr(args, 'sft_analysis_enable', False) and _rank == 0:
     analyzer = getattr(trainer, 'rep_analyzer', None)
     if analyzer is not None:
         total_size = len(wrapped_dataset)
         subset_ids = analyzer.select_subset(total_size, args.sft_analysis_ratio, args.sft_analysis_max_samples, args.sft_analysis_seed)
         logging.info(f"[SFT Analysis] Selected {len(subset_ids)} samples for representation tracking.")
-        model.eval()
+        mdl = trainer.model
+        mdl.eval()
         with torch.no_grad():
             bs = min(2, args.bsz)
             for i in tqdm(range(0, len(subset_ids), bs)):
@@ -486,18 +508,19 @@ if args.stage=='avt_sft' and getattr(args, 'sft_analysis_enable', False):
                 examples = [{ 'conversation': wrapped_dataset[j]['conversation'], 'sample_id': j } for j in cur_ids]
                 batch_b = collate_fn(examples)  # uses collate_fn_avt_sft ensuring identical preprocessing & resizing
                 # Forward pass mirroring training (teacher / latent_mode False path)
+                device = getattr(mdl, 'device', torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
                 inputs_model = {
-                    'input_ids': batch_b['teacher_input_ids'].to(model.device),
-                    'attention_mask': batch_b['teacher_attention_mask'].to(model.device),
-                    'pixel_values': batch_b['user_assistant_pixel_values'].to(model.device),
-                    'image_grid_thw': batch_b['user_assistant_image_grid_thw'].to(model.device),
+                    'input_ids': batch_b['teacher_input_ids'].to(device),
+                    'attention_mask': batch_b['teacher_attention_mask'].to(device),
+                    'pixel_values': batch_b['user_assistant_pixel_values'].to(device),
+                    'image_grid_thw': batch_b['user_assistant_image_grid_thw'].to(device),
                     'output_hidden_states': True
                 }
-                outputs = model(**inputs_model)
+                outputs = mdl(**inputs_model)
                 hidden_states = outputs.hidden_states  # list[L] each (B,S,H)
                 for bi, sid in enumerate(cur_ids):
                     analyzer.build_baseline(int(sid), [h[[bi]] for h in hidden_states])
-        model.train()
+        mdl.train()
 
 trainer.train()
 trainer.save_model(training_args.output_dir)
