@@ -11,5 +11,13 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
   --task "mm-reasoning" \
   --stage "avt_sft" \
   --data_path "./new/created_dataset/filtered_data/CoF/filtered_train.json" \
+    "./new/created_dataset/filtered_data/CoM_w_MathVista/filtered_train.json" \
+    "./new/created_dataset/filtered_data/PixelReasoner/filtered_train.json" \
+    "./new/created_dataset/filtered_data/ReFocus/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_visual_search/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_geometry/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train.json" \
+    "./new/created_dataset/filtered_data/VTS_1/filtered_train.json" \
   --log_file "./log.txt" \
   --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct"
