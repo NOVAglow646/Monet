@@ -43,7 +43,9 @@ os.environ['HF_HOME'] = cache_dir
 
 patch=14 # processor.image_processor.patch_size
 # Use slow processor to avoid fast-processor info spam and behavioral drift
-processor = AutoProcessor.from_pretrained(args.model, use_fast=False)
+#processor = AutoProcessor.from_pretrained(args.model, use_fast=False)
+rocessor = AutoProcessor.from_pretrained(args.load_model_path, use_fast=False)
+
 if _rank == 0:
     # Rewrite deprecated preprocessor.json into video_preprocessor.json by re-saving once
     try:
