@@ -7,10 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def find_epoch_files(directory: str) -> List[Tuple[int, str]]:
+def find_epoch_files(directory: str, dataset_name: str) -> List[Tuple[int, str]]:
     """Return list of (epoch, filepath) sorted by epoch for files named epoch_{n}_rep_analysis.json."""
     files = []
-    pat = re.compile(r"epoch_(\d+)_rep_analysis\.json$")
+    pat = re.compile(r"epoch_(\d+)_rep_analysis-"+dataset_name+r"\.json$")
     for name in os.listdir(directory):
         m = pat.match(name)
         if m:
@@ -22,11 +22,11 @@ def find_epoch_files(directory: str) -> List[Tuple[int, str]]:
 
 essential_suffix = "_layer_mean_avg"
 
-def load_category_matrix(directory: str, category: str) -> Tuple[np.ndarray, List[int]]:
+def load_category_matrix(directory: str, category: str, dataset_name: str) -> Tuple[np.ndarray, List[int]]:
     """Load a 2D matrix (epochs x layers) for the given category from epoch_* files.
     Returns (matrix, epochs) where matrix has shape (num_epochs, num_layers).
     """
-    eps_files = find_epoch_files(directory)
+    eps_files = find_epoch_files(directory, dataset_name)
     if not eps_files:
         raise FileNotFoundError(f"No epoch_*.json files found in {directory}")
 
@@ -86,8 +86,9 @@ def plot_heatmap(ax, mat: np.ndarray, title: str, epochs: List[int], *, cmap: st
 
 def main():
     parser = argparse.ArgumentParser(description="Plot representation similarity heatmaps across epochs and layers.")
+    parser.add_argument("--dataset_name", type=str, default="Zebra_CoT", help="Name of the dataset.")
     parser.add_argument("--dir", help="Directory containing epoch_*_rep_analysis.json files", default="./sft_analysis")
-    parser.add_argument("--out", help="Output image path. Default: <dir>/rep_heatmaps.png", default="./sft_analysis/plot_imgs/Zebra_CoT_visual_search.jpg")
+    parser.add_argument("--out_dir", help="Output image path.", default="./sft_analysis/plot_imgs/")
     parser.add_argument("--cats", nargs="*", default=["observation_poss", "non_observation_poss"],
                         help="Categories to plot (must match *_layer_mean_avg keys in summaries)")
     args = parser.parse_args()
@@ -97,7 +98,7 @@ def main():
     epochs_ref: List[int] = []
 
     for c in cats:
-        mat, epochs = load_category_matrix(args.dir, c)
+        mat, epochs = load_category_matrix(args.dir, c, args.dataset_name)
         mats[c] = mat
         if not epochs_ref:
             epochs_ref = epochs
@@ -141,7 +142,7 @@ def main():
             vmax=bound,
         )
 
-    out_path = args.out or os.path.join(args.dir, "rep_heatmaps.png")
+    out_path = os.path.join(args.out_dir,f"rep_heatmaps{args.dataset_name}.png")
     plt.tight_layout()
     plt.savefig(out_path, dpi=180)
     print(f"Saved: {out_path}")

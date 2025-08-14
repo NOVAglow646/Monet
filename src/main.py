@@ -1,7 +1,7 @@
 import os as _early_os
 # Disable parallelism in HuggingFace tokenizers to avoid fork-related warnings/deadlocks
 _early_os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-
+import shutil
 from functools import partial
 import torch
 from new.avt_qwen_model import apply_qwen2_5_avt
@@ -124,7 +124,10 @@ try:
 except Exception as _e:
     logging.debug(f"Selective gradient checkpointing skipped: {_e}")
 
-if args.stage in ['stage1', 'avt_stage1', 'avt_sft']: model.resize_token_embeddings(len(processor.tokenizer))
+if args.stage in ['stage1', 'avt_sft', 'avt_stage1']: 
+    new_vocab_size = len(processor.tokenizer)
+    model.resize_token_embeddings(new_vocab_size)
+    model.config.vocab_size = new_vocab_size
 
 if args.stage in ['stage1', 'stage2']:
     latent_token_idx = processor.tokenizer("<|latent_pad|>", return_tensors="pt")["input_ids"][0]
@@ -363,9 +366,11 @@ def collate_fn_avt_stage1(examples, alignment="boxed_start"):
                     poss_of_a_sample.extend(list(range(start, end + 1)))
             batch["teacher_alignment_poss"].append(poss_of_a_sample)
 
-    # mask tokens of '<|im_start|>assistant', '<|endoftext|>', and '<|latent_pad|>' 
+    # mask tokens of '<|im_start|>assistant', '<|endoftext|>', and '<abs_vis_token_pad>' 
     batch["student_labels"] = generate_labels_after_multi_token_start(batch["student_input_ids"], answer_start_token_pattern, end_pad_token_idx, latent_token_idx)
-    batch["teacher_labels"] = generate_labels_after_multi_token_start(batch["teacher_input_ids"], answer_start_token_pattern, end_pad_token_idx, img_pad_token_idx)
+
+    # We needn't compute the ce loss for the teacher 
+    #batch["teacher_labels"] = generate_labels_after_multi_token_start(batch["teacher_input_ids"], answer_start_token_pattern, end_pad_token_idx, img_pad_token_idx)
 
     # return a mask where tokens of <|latent_pad|> are 1, else 0
     batch["student_image_out_mask"] = mask_image_output_tokens(batch["student_input_ids"], latent_start_idx, latent_token_idx)
@@ -480,6 +485,8 @@ for data_path in args.data_path:
 dataset_name += dataset_names
 exp_name += dataset_names
 save_dir = f"./checkpoints/{exp_name}"
+if args.save_model_path != './checkpoints/':
+    save_dir = args.save_model_path
 
 if args.stage in ['stage1']:
     CustomTrainer = CustomTrainerStage1
@@ -505,7 +512,7 @@ training_args = SFTConfig(
     warmup_steps=10,
     learning_rate=1e-5,
     weight_decay=0.01,
-    logging_steps=5,
+    logging_steps=1,
     save_strategy="steps",
     save_steps=200,
     save_total_limit=3,
@@ -538,6 +545,7 @@ if args.stage == 'avt_sft':
     setattr(training_args, 'sft_analysis_save_dir', args.sft_analysis_save_dir)
     setattr(training_args, 'sft_analysis_categories', args.sft_analysis_categories)
     setattr(training_args, 'dataset_names', dataset_names)
+    setattr(training_args, 'observation_ce_factor', args.observation_ce_factor)
 
 # Initialize the trainer (callbacks that need trainer instance will be added after)
 trainer = CustomTrainer(
@@ -650,6 +658,13 @@ if args.stage == 'avt_sft' and getattr(args, 'sft_analysis_enable', False):
 
         # Step 4: run baseline forward on this rank's shard
         mdl.eval()
+
+        # clean up the saved reps from previous SFT experiments
+        rep_save_path = os.path.join(analyzer.save_dir, f'baseline_reps{dataset_names}')
+        if os.path.isdir(rep_save_path):
+            shutil.rmtree(rep_save_path)
+            os.makedirs(rep_save_path, exist_ok=True)
+
         with torch.inference_mode():
             bs = min(2, args.bsz)
             for i in tqdm(range(0, len(shard_ids), bs)):
@@ -684,9 +699,10 @@ if args.stage == 'avt_sft' and getattr(args, 'sft_analysis_enable', False):
             logging.info(f"[SFT Analysis][rank {rank}] passed barrier, start loading baselines")
 
         # Step 6: load all baselines from disk to local memory for training-time updates
-        baseline_dir = os.path.join(analyzer.save_dir, f'baseline_reps_{dataset_names}')
+        baseline_dir = os.path.join(analyzer.save_dir, f'baseline_reps{dataset_names}')
         if os.path.isdir(baseline_dir):
             import glob
+
             paths = glob.glob(os.path.join(baseline_dir, 'baseline_*.pt'))
             loaded = 0
             for p in tqdm(paths, desc=f"[rank {rank}] loading all baseline reps", total=len(paths)):

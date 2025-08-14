@@ -42,7 +42,7 @@ def get_args():
                         help="Proportion (0~1] of the whole training dataset to sample for representation analysis. Ignored if disable.")
     parser.add_argument("--sft_analysis_seed", type=int, default=1234,
                         help="Random seed for sampling analysis subset.")
-    parser.add_argument("--sft_analysis_max_samples", type=int, default=500,
+    parser.add_argument("--sft_analysis_max_samples", type=int, default=200,
                         help="Maximum number of samples to track even if ratio yields more.")
     parser.add_argument("--sft_analysis_save_dir", type=str, default="./sft_analysis",
                         help="Directory to save analysis artifacts (subset ids, per-epoch cosine stats).")
@@ -51,6 +51,8 @@ def get_args():
     # DeepSpeed config path (optional). If provided, Trainer will enable DeepSpeed with this config.
     parser.add_argument("--deepspeed", type=str, default="",
                         help="Path to DeepSpeed config JSON, e.g., ./deepspeed/ds_zero2_cpu_offload.json")
+    parser.add_argument("--save_model_path", type=str, default='./checkpoints/',help="Path to save the model checkpoints.")
+    parser.add_argument("--observation_ce_factor", default=1.0, type=float)
     return parser.parse_args()
 
 def seed_everything(seed: int = 42):
@@ -691,7 +693,7 @@ class SFTRepAnalyzer:
             return
         self.layer_count = stacked.shape[0]
         if self.save_baseline_flag:
-            baseline_folder = f'baseline_reps_{self.dataset_names}'
+            baseline_folder = f'baseline_reps{self.dataset_names}'
             os.makedirs(os.path.join(self.save_dir, baseline_folder), exist_ok=True)
             torch.save(stacked, os.path.join(self.save_dir, baseline_folder, f'baseline_{sample_id}.pt'))
         self.baseline[sample_id] = stacked

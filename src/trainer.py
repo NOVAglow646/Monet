@@ -67,7 +67,7 @@ class CustomTrainerAVTStage1(SFTTrainer):
                 writer.writerow([
                     "global_step","epoch",
                     "loss_total",
-                    "loss_student_ce", "loss_teacher_ce",
+                    "loss_student_ce",
                     "loss_align"
                 ])
                 
@@ -105,10 +105,10 @@ class CustomTrainerAVTStage1(SFTTrainer):
         inputs['attention_mask'] = inputs['teacher_attention_mask']
         inputs['pixel_values'] = inputs['user_assistant_pixel_values']
         inputs['image_grid_thw'] = inputs['user_assistant_image_grid_thw']
-        inputs['labels'] = inputs['teacher_labels']
+        inputs['labels'] = None #inputs['teacher_labels'] # We needn't compute the ce loss for the teacher input in this stage
         inputs['alignment_poss'] = inputs['teacher_alignment_poss']
         inputs['image_out_mask'] = inputs['teacher_image_out_mask']
-        (teacher_ce_loss, teacher_outputs) = super().compute_loss(
+        (_, teacher_outputs) = super().compute_loss(
                 model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
             )
             
@@ -133,10 +133,9 @@ class CustomTrainerAVTStage1(SFTTrainer):
         (student_ce_loss, student_outputs) = super().compute_loss(
                 model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
         )
-        loss = teacher_ce_loss + student_ce_loss + self.weight *alignment_loss
+        loss = student_ce_loss + self.weight *alignment_loss
 
         outputs_student_loss = student_ce_loss.item()
-        outputs_teacher_loss = teacher_ce_loss.item()
 
         del student_outputs, teacher_outputs
         gc.collect()
@@ -151,7 +150,6 @@ class CustomTrainerAVTStage1(SFTTrainer):
                     self.state.epoch,
                     loss.item(),
                     outputs_student_loss,
-                    outputs_teacher_loss,
                     alignment_loss.item() if isinstance(alignment_loss, torch.Tensor) else alignment_loss,
                 ])
         # --------------------------------------------
@@ -220,8 +218,13 @@ class CustomTrainerSFT(SFTTrainer):
             if k in inputs:
                 poss_dict[k] = inputs[k]
         inputs['sft_analysis_poss'] = poss_dict
+        if 'sft_analysis_poss' in inputs and isinstance(inputs['sft_analysis_poss'], dict):
+            inputs['alignment_poss'] = inputs['sft_analysis_poss'].get('observation_poss', None)
+        inputs['observation_ce_factor'] = getattr(self.args, 'observation_ce_factor', 1.0)
         (teacher_ce_loss, teacher_outputs) = super().compute_loss(
-                model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+                model, 
+                inputs,
+                return_outputs=True, num_items_in_batch=num_items_in_batch
             )
 
         # Representation analysis update

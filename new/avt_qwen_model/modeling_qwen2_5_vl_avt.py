@@ -32,6 +32,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from transformers.activations import ACT2FN
+import torch.nn.functional as F
 from transformers.cache_utils import Cache, DynamicCache
 from transformers.generation import GenerationMixin
 from transformers.masking_utils import create_causal_mask, create_sliding_window_causal_mask
@@ -1619,15 +1620,16 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
             )
 
             hidden_states_to_return = []
-            if alignment_poss is not None: # distill
-                for i, hidden_states in enumerate(outputs.hidden_states):
-                    # hidden_state: (batch_size, seq_len, hidden_dim)
-                    hidden_states_per_layer = []
-                    for b in range(hidden_states.shape[0]):
-                        hidden_states_per_layer.append(hidden_states[b, alignment_poss[b], :])
-                    hidden_states_to_return.append(hidden_states_per_layer)
-            else: # sft analysis
-                hidden_states_to_return = outputs.hidden_states
+            if output_hidden_states:
+                if alignment_poss is not None: # distill
+                    for i, hidden_states in enumerate(outputs.hidden_states):
+                        # hidden_state: (batch_size, seq_len, hidden_dim)
+                        hidden_states_per_layer = []
+                        for b in range(hidden_states.shape[0]):
+                            hidden_states_per_layer.append(hidden_states[b, alignment_poss[b], :])
+                        hidden_states_to_return.append(hidden_states_per_layer)
+                else: # sft analysis
+                    hidden_states_to_return = outputs.hidden_states
                 
             output = Qwen2_5_VLModelOutputWithPast(
                 last_hidden_state=outputs.last_hidden_state,
@@ -1742,6 +1744,7 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         teacher_hidden_states_for_alignment: Optional[List[List[torch.Tensor]]] = None, # for the latent forward
         ce_patch_pos: Optional[List[List[int]]] = None, 
         ce_patch_vec: Optional[List[torch.Tensor]] = None,
+        observation_ce_factor: Optional[float] = 1.0,
         **kwargs: Unpack[TransformersKwargs],
     ) -> Union[tuple, Qwen2_5_VLCausalLMOutputWithPast]:
         r"""
@@ -1826,7 +1829,37 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
 
         loss = None
         if labels is not None and not latent_mode:
-            loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size)
+            # Optional: apply per-token weighting on alignment_poss
+            use_weight = (
+                alignment_poss is not None and isinstance(alignment_poss, (list, tuple)) and len(alignment_poss) > 0 and
+                isinstance(observation_ce_factor, (int, float)) and observation_ce_factor is not None and float(observation_ce_factor) != 1.0
+            )
+            if use_weight:
+                # Compute token-wise CE with ignore_index and apply weights on selected positions
+                vocab = self.config.vocab_size
+                B, S, V = logits.shape
+                logits_flat = logits.view(-1, V)
+                labels_flat = labels.view(-1)
+                ce_flat = F.cross_entropy(logits_flat, labels_flat, reduction='none', ignore_index=-100)
+                ce = ce_flat.view(B, S)
+
+                # Build weights mask
+                weight = torch.ones_like(ce)
+                try:
+                    for b, poss in enumerate(alignment_poss):
+                        if poss is None:
+                            continue
+                        weight[b, poss] = float(observation_ce_factor)
+                except Exception:
+                    # Fallback to unweighted if alignment_poss malformed
+                    weight = torch.ones_like(ce)
+
+                valid = (labels != -100).float()
+                num_valid = valid.sum().clamp_min(1.0)
+                loss = (ce * weight * valid).sum() / num_valid
+            else:
+                # Fallback to default loss function
+                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size)
         else:
             loss = outputs.alignment_loss
 
