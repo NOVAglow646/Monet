@@ -53,6 +53,7 @@ def get_args():
                         help="Path to DeepSpeed config JSON, e.g., ./deepspeed/ds_zero2_cpu_offload.json")
     parser.add_argument("--save_model_path", type=str, default='./checkpoints/',help="Path to save the model checkpoints.")
     parser.add_argument("--observation_ce_factor", default=1.0, type=float)
+    parser.add_argument("--observation_ce_warmup_steps", default=50, type=int)
     return parser.parse_args()
 
 def seed_everything(seed: int = 42):

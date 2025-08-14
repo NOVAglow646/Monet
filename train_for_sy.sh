@@ -26,4 +26,6 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
   --sft_analysis_enable \
   --sft_analysis_ratio 0.1 \
-  --sft_analysis_categories non_observation_poss observation_poss
+  --sft_analysis_categories non_observation_poss observation_poss \
+  --observation_ce_factor 3.0 \
+  --observation_ce_warmup_steps 100

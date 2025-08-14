@@ -6,6 +6,7 @@ import os, csv, torch, datetime
 import gc
 import numpy as np
 from .utils import SFTRepAnalyzer
+import math
 
 class CustomTrainerStage1(SFTTrainer):
         
@@ -168,6 +169,29 @@ class CustomTrainerSFT(SFTTrainer):
             kwargs['processing_class'] = kwargs.pop('tokenizer')
         super().__init__(*args, **kwargs)
         self.weight = 1.0
+        # observation_ce_factor warmup configuration
+        # Target factor (backward compatible with existing arg name)
+        self._obs_ce_target: float = float(getattr(self.args, 'observation_ce_factor', 1.0))
+        # Optional absolute warmup steps takes precedence over ratio
+        self._obs_ce_warmup_steps: int = int(getattr(self.args, 'observation_ce_warmup_steps', 0) or 0)
+
+        # Helper: compute total training steps if needed (may be updated later, so compute on demand as well)
+        def _estimate_total_steps() -> int:
+            # Prefer TrainerState.max_steps if available and > 0
+            try:
+                if hasattr(self.state, 'max_steps') and self.state.max_steps and self.state.max_steps > 0:
+                    return int(self.state.max_steps)
+            except Exception:
+                pass
+            # Fallback to args.max_steps if provided (>0)
+            try:
+                if hasattr(self.args, 'max_steps') and self.args.max_steps and self.args.max_steps > 0:
+                    return int(self.args.max_steps)
+            except Exception:
+                pass
+            return 0
+
+        self._obs_ce_total_steps_hint = _estimate_total_steps()
         # Representation analysis
         self.rep_analyzer = None
         args_cfg = self.args
@@ -201,6 +225,28 @@ class CustomTrainerSFT(SFTTrainer):
                     "loss_teacher_ce"
                 ])
 
+    def _current_observation_ce_factor(self) -> float:
+        """Linear warmup from 1.0 -> target over N steps or ratio of total steps.
+
+        Priority: observation_ce_warmup_steps (absolute) > observation_ce_warmup_ratio > no warmup.
+        After warmup, clamp to target. If target <= 1.0, return target directly.
+        """
+        target = float(self._obs_ce_target)
+        if target == 1.0:
+            return 1.0
+
+        # Decide warmup steps
+        warmup_steps = int(self._obs_ce_warmup_steps or 0)
+
+        if warmup_steps <= 0:
+            # No warmup configured or cannot determine steps
+            return target
+
+        # Use current global_step (before increment) for smooth schedule in training loop
+        gs = int(getattr(self.state, 'global_step', 0) or 0)
+        progress = min(1.0, max(0.0, gs / float(max(1, warmup_steps))))
+        return float(1.0 + (target - 1.0) * progress)
+
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
@@ -220,7 +266,9 @@ class CustomTrainerSFT(SFTTrainer):
         inputs['sft_analysis_poss'] = poss_dict
         if 'sft_analysis_poss' in inputs and isinstance(inputs['sft_analysis_poss'], dict):
             inputs['alignment_poss'] = inputs['sft_analysis_poss'].get('observation_poss', None)
-        inputs['observation_ce_factor'] = getattr(self.args, 'observation_ce_factor', 1.0)
+        # Dynamic warmup factor passed to model.forward
+        inputs['observation_ce_factor'] = self._current_observation_ce_factor()
+        #print("Observation CE Factor:", inputs['observation_ce_factor'])
         (teacher_ce_loss, teacher_outputs) = super().compute_loss(
                 model, 
                 inputs,

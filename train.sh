@@ -73,10 +73,12 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     "./new/created_dataset/filtered_data/VTS_1/filtered_train.json" \
   --log_file "./log.txt" \
   --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
+  --sft_analysis_enable \
   --sft_analysis_ratio 0.1 \
   --sft_analysis_categories non_observation_poss observation_poss \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
-  --observation_ce_factor 3.0
+  --observation_ce_factor 3.0 \
+  --observation_ce_warmup_steps 100
 
 
 export CUDA_HOME=/usr/local/cuda-12.6
@@ -111,13 +113,18 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
 #####################################################################
 # AVT stage1
 #####################################################################
+export CUDA_HOME=/usr/local/cuda-12.6
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}
 conda activate mirage
 cd /home/dids/shiyang/codes/abstract-visual-token
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 export TOKENIZERS_PARALLELISM=false
 python -m src.main \
-    --model "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
-    --epochs "10" \
+    --model "/home/dids/shiyang/checkpoints/0812-avt_sft-shuffle" \
+    --epochs 10 \
+    --bsz 1 \
+    --grad_accum_steps 16 \
     --task "mm-reasoning" \
     --min_latent_size 6 \
     --min_latent_compress_factor 20 \
@@ -130,7 +137,9 @@ python -m src.main \
     "./new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train.json" \
     "./new/created_dataset/filtered_data/Zebra_CoT_visual_search/filtered_train.json" \
     "./new/created_dataset/filtered_data/Zebra_CoT_geometry/filtered_train.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train.json" \
+    "./new/created_dataset/filtered_data/VTS_1/filtered_train.json" \
     --log_file "./log.txt" \
     --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
-    --save_model_path "./checkpoints/model_stage1" \
-    --alignment "observation_all"
+    --alignment "observation_all" \
+    --deepspeed ./deepspeed/ds_zero2_gpu.json 

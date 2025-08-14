@@ -380,9 +380,6 @@ def collate_fn_avt_stage1(examples, alignment="boxed_start"):
 
     return batch
 
-
-
-
 def collate_fn_avt_sft(examples):
     # examples: list of {conversation: [...], sample_id: int}
     sample_ids = [ex['sample_id'] for ex in examples]
@@ -473,7 +470,6 @@ else:
 exp_name = f"ep{args.epochs}-bsz{args.bsz}-lr{1e-5}"
 if args.stage == 'avt_stage1':
     exp_name += f"-{args.min_latent_size}-{args.min_latent_compress_factor}-{args.max_latent_compress_factor}"
-if args.stage in ["avt_stage1"]:
     exp_name = f"{args.alignment}-" + exp_name
 exp_name = args.stage+'-'+exp_name
 if args.shuffle_train:
@@ -482,8 +478,9 @@ dataset_names = ""
 for data_path in args.data_path:
     dataset_name = data_path.split("/")[-2]
     dataset_names += f"-{dataset_name}"
-dataset_name += dataset_names
-exp_name += dataset_names
+if args.stage == "avt_sft":
+    exp_name += f"obs_ce_{args.observation_ce_factor}-obs_warmup_{args.observation_ce_warmup_steps}"
+
 save_dir = f"./checkpoints/{exp_name}"
 if args.save_model_path != './checkpoints/':
     save_dir = args.save_model_path
@@ -546,6 +543,7 @@ if args.stage == 'avt_sft':
     setattr(training_args, 'sft_analysis_categories', args.sft_analysis_categories)
     setattr(training_args, 'dataset_names', dataset_names)
     setattr(training_args, 'observation_ce_factor', args.observation_ce_factor)
+    setattr(training_args, 'observation_ce_warmup_steps', args.observation_ce_warmup_steps)
 
 # Initialize the trainer (callbacks that need trainer instance will be added after)
 trainer = CustomTrainer(

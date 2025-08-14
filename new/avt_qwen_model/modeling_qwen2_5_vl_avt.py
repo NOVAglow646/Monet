@@ -1839,8 +1839,10 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                 vocab = self.config.vocab_size
                 B, S, V = logits.shape
                 logits_flat = logits.view(-1, V)
-                labels_flat = labels.view(-1)
-                ce_flat = F.cross_entropy(logits_flat, labels_flat, reduction='none', ignore_index=-100)
+                labels = nn.functional.pad(labels, (0, 1), value=-100)
+                shift_labels = labels[..., 1:].contiguous()
+                shift_labels_flat = shift_labels.view(-1)
+                ce_flat = F.cross_entropy(logits_flat, shift_labels_flat, reduction='none', ignore_index=-100)
                 ce = ce_flat.view(B, S)
 
                 # Build weights mask
@@ -1849,13 +1851,13 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                     for b, poss in enumerate(alignment_poss):
                         if poss is None:
                             continue
-                        weight[b, poss] = float(observation_ce_factor)
+                        weight[b, torch.tensor(poss)-1] = float(observation_ce_factor)
                 except Exception:
                     # Fallback to unweighted if alignment_poss malformed
                     weight = torch.ones_like(ce)
 
-                valid = (labels != -100).float()
-                num_valid = valid.sum().clamp_min(1.0)
+                valid = (shift_labels != -100).float()
+                num_valid = (weight * valid).sum().clamp_min(1.0)
                 loss = (ce * weight * valid).sum() / num_valid
             else:
                 # Fallback to default loss function
