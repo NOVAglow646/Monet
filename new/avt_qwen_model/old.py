@@ -30,7 +30,7 @@ from typing import Any, Callable, Optional, Union, List
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import time
+
 from transformers.activations import ACT2FN
 import torch.nn.functional as F
 from transformers.cache_utils import Cache, DynamicCache
@@ -1315,6 +1315,8 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
         dtype  = inputs_embeds.dtype
 
 
+        if teacher_hidden_states_for_alignment is not None: # latent-alignment_losss forward
+            total_align_loss = 0.
         if self.training:
             ce_patch_pos = [[] for _ in range(batch_size)]   # List[List[int]]
             ce_patch_vec = [[] for _ in range(batch_size)]   # List[List[Tensor(H,)]]
@@ -1322,12 +1324,10 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
         
 
         if latent_mode:
-            total_align_loss = None
-
             def alignment_loss(teacher_hidden_states_all: List[List[torch.Tensor]], student_hidden_states_all: List[torch.Tensor], batch_id: int, poss: int):
                 # teacher_hidden_states_all: (num_layers, batch_size, seq_len, hidden_dim)
                 # student_hidden_states_all: (num_layers, seq_len, hidden_dim) (a single sample in the batch, indicated by batch_id)
-                total_loss = 0
+                total_loss = 0.
                 bsz = len(teacher_hidden_states_all[0])
                 num_layers = len(teacher_hidden_states_all)
                 for student_rep_l, teacher_rep_l in zip(student_hidden_states_all, teacher_hidden_states_all):
@@ -1336,14 +1336,8 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                     student_rep_l = student_rep_l.to(teacher_rep_l[batch_id].device)
                     sim = torch.nn.functional.cosine_similarity(student_rep_l, teacher_rep_l[batch_id][poss, :])
                     # we don't use poss to index the student representations here since the student representations are already sliced according to poss
-                    total_loss += 1 - sim
+                    total_loss += (1 - sim).sum()
                 total_loss = total_loss / num_layers
-                '''print(total_loss)
-                if total_loss == 0:
-                    print("teacher",teacher_hidden_states_all)
-                    print("student",student_hidden_states_all)
-                    print("poss",poss)
-                    '''
                 return total_loss
             
             def detach_past_kv(pkv):
@@ -1382,18 +1376,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                 except Exception as e:
                     raise TypeError(f"Unsupported past_key_values type: {type(pkv)}") from e
 
-            def cache_kv_shapes(cache):
-                """Return list of (k_shape, v_shape) for each layer."""
-                shapes = []
-                for layer in getattr(cache, "layers", []):
-                    k = getattr(layer, "keys", None)
-                    v = getattr(layer, "values", None)
-                    shapes.append((
-                        None if not isinstance(k, torch.Tensor) else tuple(k.shape),
-                        None if not isinstance(v, torch.Tensor) else tuple(v.shape),
-                    ))
-                return shapes
-
+            
             
 
             # (B, L, H) for final hidden states (仍然保留，用不上可删除)
@@ -1417,12 +1400,12 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
 
             # ------------------------------------------------------------------
             # 2.  Iterate samples
-            # ------------------------------------------------------------------   
+            # ------------------------------------------------------------------
             for b in range(batch_size):
                 latent_pos   = latent_lists[b]
                 align_pos    = sorted(alignment_poss[b])        # assumption: 递增
                 align_ptr    = 0                                # pointer into align_pos list
-                align_losses_this_b = []
+                alignment_loss_b = 0.
                 last_latent_pos_before_alignment = [] # same len as align_pos
                 for ap in align_pos:
                     # find the last latent position before this alignment position
@@ -1433,7 +1416,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                 pos_ids_s    = position_ids[:, b : b + 1]       # (3,1,L)
                 attn_mask_s  = attention_mask[b : b + 1] if attention_mask is not None else None
 
-                # ---------- No latent tokens, forward only once ----------
+                # ---------- 无 latent，直接一次 forward ----------
                 if not latent_pos:
                     out = self.language_model(
                         input_ids=None,
@@ -1473,7 +1456,6 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                         seg_pos_ids = pos_ids_s[:, :, prev_idx:pos]
                         seg_att_m   = attn_mask_s[:, :pos] if attn_mask_s is not None else None
 
-                        #print("[Non latent seg - before forward] ", cache_kv_shapes(past_kv))
                         seg_out = self.language_model(
                             input_ids=None,
                             inputs_embeds=seg_embeds,
@@ -1485,7 +1467,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                             return_dict=True,
                             **kwargs,
                         )
-                        #print("[Non latent seg - after forward] ", cache_kv_shapes(past_kv))
+
                         num_layers = len(seg_out.hidden_states)
                         hidden_states_layers = [[] for _ in range(num_layers)]
                         teacher_align_poss = []
@@ -1515,17 +1497,16 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
 
 
                         # alignment loss
-                        if teacher_hidden_states_for_alignment is not None and len(teacher_align_poss) > 0:
-                            l_b = alignment_loss(
+                        if teacher_hidden_states_for_alignment is not None:
+                            alignment_loss_b = alignment_loss(
                                 teacher_hidden_states_for_alignment, hidden_states_to_compute_loss, b, teacher_align_poss
                             )
-                            align_losses_this_b.append(l_b)
 
                         # keep last hidden & kv
                         batch_last_hidden_state[b, prev_idx:pos, :] = seg_out.last_hidden_state[0]
                         past_kv = seg_out.past_key_values
-                        past_kv = detach_past_kv(past_kv)  # stop gradient so that subsequent alignment loss will not backward the gradient to the latent tokens of the current segment
-
+                        past_kv = detach_past_kv(past_kv) # stop gradient so that subsequent alignment loss will not backward the gradient to the latent tokens of the current segment
+                        
                     # sentinel → done
                     if pos == seq_len:
                         break
@@ -1549,7 +1530,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
 
                     step_pos_ids = pos_ids_s[:, :, pos : pos + 1]
                     step_att_m   = attn_mask_s[:, : pos + 1] if attn_mask_s is not None else None
-                    #print("[Latent seg - before forward] ", cache_kv_shapes(past_kv))
+
                     step_out = self.language_model(
                         input_ids=None,
                         inputs_embeds=latent_embed,
@@ -1562,7 +1543,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                         return_dict=True,
                         **kwargs,
                     )
-                    #print("[Latent seg - after forward] ", cache_kv_shapes(past_kv))
+
                     '''# alignment 位置若恰好为 pos
                     if align_ptr < len(align_pos) and align_pos[align_ptr] == pos:
                         for l in range(num_layers):
@@ -1578,19 +1559,11 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
 
                 past_key_values_batch[b] = past_kv
                 
-                if len(align_losses_this_b) > 0:
-                    # normalize inside-tasks however you want
-                    align_loss_b = torch.cat(align_losses_this_b).sum() / max(1, len(align_pos))
-                else:
-                    align_loss_b = torch.zeros((), device=device, dtype=dtype)
-
-                if total_align_loss is None:
-                    total_align_loss = align_loss_b
-                else:
-                    total_align_loss += align_loss_b
+                if alignment_loss_b > 0:
+                    total_align_loss += alignment_loss_b / len(align_pos)
             # ---------- end for-batch loop ----------
 
-            total_align_loss = total_align_loss/batch_size  # or .sum()
+            total_align_loss = total_align_loss / batch_size
 
             # ------------------------------------------------------------------
             # 3. Collect the latent token embeddings for the next CE loss forward stage

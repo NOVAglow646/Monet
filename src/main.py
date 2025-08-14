@@ -17,7 +17,6 @@ from src.task import *
 from src.trainer import CustomTrainerStage1, CustomTrainerStage2
 from src.trainer import CustomTrainerAVTStage1, CustomTrainerSFT
 import random
-import wandb
 
 seed_everything(seed=42)
 args=get_args()
@@ -51,7 +50,6 @@ if _rank == 0:
     # Rewrite deprecated preprocessor.json into video_preprocessor.json by re-saving once
     try:
         processor.save_pretrained(args.load_model_path)
-        wandb.init(project='Latent_Think',name='08_14-avt_sft',config={"observation_ce_factor":args.observation_ce_factor,"sft_analysis_ratio":args.sft_analysis_ratio})
     except Exception as _e:
         logging.debug(f"Processor save_pretrained skip: {_e}")
 
@@ -98,31 +96,31 @@ model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
 # Prefer non-reentrant checkpointing to avoid requires_grad warnings (when enabled)
 # Enable gradient checkpointing only on the LM/backbone (not on the frozen visual tower)
 try:
-    if args.stage != "avt_stage1":
-        # Always disable global GC first to avoid touching the visual branch
-        model.gradient_checkpointing_disable()
+    #if args.stage != "avt_stage1":
+    # Always disable global GC first to avoid touching the visual branch
+    model.gradient_checkpointing_disable()
 
-        gc_kwargs = {"use_reentrant": False}
+    gc_kwargs = {"use_reentrant": False}
 
-        enabled = False
-        # Qwen2.5-VL commonly exposes the backbone under one of these attributes
-        for attr in ["language_model", "transformer", "model"]:
-            sub = getattr(model, attr, None)
-            if sub is not None and hasattr(sub, "gradient_checkpointing_enable"):
-                sub.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gc_kwargs)
-                enabled = True
-                break
+    enabled = False
+    # Qwen2.5-VL commonly exposes the backbone under one of these attributes
+    for attr in ["language_model", "transformer", "model"]:
+        sub = getattr(model, attr, None)
+        if sub is not None and hasattr(sub, "gradient_checkpointing_enable"):
+            sub.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gc_kwargs)
+            enabled = True
+            break
 
-        # Fallback: if we didn't find a known submodule, skip enabling to avoid useless warnings
-        if not enabled:
-            logging.warning("Could not locate LM backbone to enable gradient checkpointing; leaving it disabled.")
+    # Fallback: if we didn't find a known submodule, skip enabling to avoid useless warnings
+    if not enabled:
+        logging.warning("Could not locate LM backbone to enable gradient checkpointing; leaving it disabled.")
 
-        # Make sure embeddings create grads for checkpointed layers
-        if hasattr(model, "enable_input_require_grads"):
-            model.enable_input_require_grads()
+    # Make sure embeddings create grads for checkpointed layers
+    if hasattr(model, "enable_input_require_grads"):
+        model.enable_input_require_grads()
 
-        # HF requires use_cache=False when GC is on (you already set it above)
-        model.config.use_cache = False
+    # HF requires use_cache=False when GC is on (you already set it above)
+    model.config.use_cache = False
 except Exception as _e:
     logging.debug(f"Selective gradient checkpointing skipped: {_e}")
 
@@ -519,7 +517,7 @@ training_args = SFTConfig(
     bf16=True,
     push_to_hub=False,
     remove_unused_columns=False,
-    gradient_checkpointing=False if args.stage == "avt_stage1" else True,
+    gradient_checkpointing=True, #False if args.stage == "avt_stage1" else True,
     dataset_text_field="",
     dataset_kwargs={"skip_prepare_dataset": True},
     report_to=[],
