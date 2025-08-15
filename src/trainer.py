@@ -45,10 +45,10 @@ class CustomTrainerStage2(SFTTrainer):
         return (loss, outputs) if return_outputs else loss
     
 class CustomTrainerAVTStage1(SFTTrainer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs): 
         self.exp_name =kwargs.pop('exp_name')
         super().__init__(*args, **kwargs)
-        self.weight = 1.0
+        self.weight = args.alignment_weight
         # 仅 rank‑0 进程写文件，防止多卡重复
         self.is_main_process = (
             not torch.distributed.is_initialized()
@@ -109,9 +109,11 @@ class CustomTrainerAVTStage1(SFTTrainer):
         inputs['labels'] = None #inputs['teacher_labels'] # We needn't compute the ce loss for the teacher input in this stage
         inputs['alignment_poss'] = inputs['teacher_alignment_poss']
         inputs['image_out_mask'] = inputs['teacher_image_out_mask']
-        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        #model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        model.gradient_checkpointing_disable()
         #logging.info("Getting teacher reps...")
-        teacher_outputs = model(**inputs, return_dict=True, output_hidden_states=True)
+        with torch.no_grad():
+            teacher_outputs = model(**inputs, return_dict=True, output_hidden_states=True)
             
         inputs['latent_mode'] = True
         inputs['input_ids'] = inputs['student_input_ids']
@@ -140,9 +142,16 @@ class CustomTrainerAVTStage1(SFTTrainer):
 
         outputs_student_loss = student_ce_loss.item()
 
+        # Avoid per-step cache clearing which forces device sync and hurts utilization.
+        # Just release references; optionally run a light GC periodically.
         del student_outputs, teacher_outputs
-        gc.collect()
-        torch.cuda.empty_cache()
+        step = int(getattr(self.state, 'global_step', 0) or 0)
+        if self.is_main_process and step > 0 and (step % 20 == 0):
+            try:
+                gc.collect()
+                # DO NOT call torch.cuda.empty_cache() every step; it stalls the GPU.
+            except Exception:
+                pass
         
         # --------  写本地文件  --------
         if self.is_main_process:
@@ -266,9 +275,8 @@ class CustomTrainerSFT(SFTTrainer):
         for k in ['boxed_start_poss','observation_poss','non_observation_poss']:
             if k in inputs:
                 poss_dict[k] = inputs[k]
-        inputs['sft_analysis_poss'] = poss_dict
-        if 'sft_analysis_poss' in inputs and isinstance(inputs['sft_analysis_poss'], dict):
-            inputs['alignment_poss'] = inputs['sft_analysis_poss'].get('observation_poss', None)
+        sft_analysis_poss = poss_dict
+        inputs['ce_emphasize_poss'] = inputs['observation_poss']
         # Dynamic warmup factor passed to model.forward
         inputs['observation_ce_factor'] = self._current_observation_ce_factor()
         #print("Observation CE Factor:", inputs['observation_ce_factor'])

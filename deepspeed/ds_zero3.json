@@ -1,0 +1,23 @@
+{
+  "train_micro_batch_size_per_gpu": "auto",
+  "gradient_accumulation_steps": "auto",
+
+  "bf16": { "enabled": true },
+  "fp16": { "enabled": false },
+
+  "zero_optimization": {
+    "stage": 3,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "contiguous_gradients": true,
+
+    "stage3_prefetch_bucket_size": 200000000,
+    "stage3_param_persistence_threshold": 1000000,
+    "stage3_max_live_parameters": 30000000,
+    "stage3_max_reuse_distance": 10000000
+  },
+
+  "gradient_clipping": 1.0,
+  "steps_per_print": 0,
+  "wall_clock_breakdown": false
+}

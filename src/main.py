@@ -17,7 +17,7 @@ from src.task import *
 from src.trainer import CustomTrainerStage1, CustomTrainerStage2
 from src.trainer import CustomTrainerAVTStage1, CustomTrainerSFT
 import random
-
+import wandb
 seed_everything(seed=42)
 args=get_args()
 
@@ -43,13 +43,13 @@ os.environ['HF_HOME'] = cache_dir
 
 patch=14 # processor.image_processor.patch_size
 # Use slow processor to avoid fast-processor info spam and behavioral drift
-#processor = AutoProcessor.from_pretrained(args.model, use_fast=False)
 processor = AutoProcessor.from_pretrained(args.load_model_path, use_fast=False)
 
 if _rank == 0:
     # Rewrite deprecated preprocessor.json into video_preprocessor.json by re-saving once
     try:
         processor.save_pretrained(args.load_model_path)
+        wandb.init(project='Latent-Think',entity="Latent-Think",name=args.wandb_name,config={"observation_ce_factor":args.observation_ce_factor,"sft_analysis_ratio":args.sft_analysis_ratio})
     except Exception as _e:
         logging.debug(f"Processor save_pretrained skip: {_e}")
 
@@ -65,8 +65,7 @@ elif args.stage in ['avt_stage1', 'avt_sft']:
     processor.tokenizer.add_tokens("</observation>", special_tokens=True)
 
 config = Qwen2_5_VLConfig.from_pretrained(args.load_model_path)
-config.compress_strategy = args.compress_strategy
-config.latent_size = args.latent_size
+
 config.stage = args.stage
 # Avoid `use_cache=True` with gradient checkpointing warnings; training doesn't need cache
 config.use_cache = False
@@ -149,100 +148,6 @@ for param in model.visual.parameters():
 
 
 
-def collate_fn_stage1(examples):
-    texts = [processor.apply_chat_template(example, tokenize=False) for example in examples]
-
-    texts = [place_input_image(text) for text in texts]
-    texts = [place_output_image(text) for text in texts]
-    # replace <|vision_start|><|image_pad|><|vision_end|> with <abs_vis_token><|image_pad|></abs_vis_token> after each <|im_start|>assistant
-    texts = replace_visual_spectial_tokens(texts)
-
-    image_inputs, _ = process_vision_info(examples)
-
-    user_examples = remove_assistant_images(examples)
-    user_text = [processor.apply_chat_template(example, tokenize=False) for example in user_examples]
-    user_text = replace_visual_spectial_tokens(user_text)
-    user_image_inputs, _ = process_vision_info(user_examples)
-    user_batch = processor(text=user_text, images=user_image_inputs, return_tensors="pt", padding=True)
-
-    assistant_examples = remove_user_images(examples)
-    assistant_text = [processor.apply_chat_template(example, tokenize=False) for example in assistant_examples]
-    assistant_text = replace_visual_spectial_tokens(assistant_text)
-    assistant_image_inputs, _ = process_vision_info(assistant_examples)
-    assistant_batch = processor(text=assistant_text, images=assistant_image_inputs, return_tensors="pt", padding=True)
-
-    batch = processor(text=texts, images=image_inputs, return_tensors="pt", padding=True)
-
-    batch['pixel_values'] = user_batch['pixel_values']
-    batch['image_grid_thw'] = user_batch['image_grid_thw']
-
-    batch['pixel_values_latent'] = assistant_batch['pixel_values']
-    batch['image_grid_thw_latent'] = assistant_batch['image_grid_thw']
-
-    latent_token_idx = processor.tokenizer("<|latent_pad|>", return_tensors="pt")["input_ids"][0]
-    latent_start_idx = processor.tokenizer("<|latent_start|>", return_tensors="pt")["input_ids"][0]
-    latent_end_idx = processor.tokenizer("<|latent_end|>", return_tensors="pt")["input_ids"][0]
-
-    end_pad_token_idx = processor.tokenizer("<|endoftext|>", return_tensors="pt")["input_ids"][0]
-
-    # <|latent_start|><|image_pad|><|latent_end|> -> <|latent_start|><|latent_pad|>...<|latent_end|>; pad the sequences to the same length
-    new_input_ids, new_attention_mask = process_batch(batch["input_ids"], batch["attention_mask"], 
-                                                      latent_start_idx, latent_end_idx, latent_token_idx, args.latent_size, end_pad_token_idx)
-
-    batch["input_ids"] = new_input_ids
-    batch["attention_mask"] = new_attention_mask
-
-    answer_start_token_pattern = processor.tokenizer("<|im_start|>assistant", return_tensors="pt")["input_ids"][0]
-
-    # mask tokens of '<|im_start|>assistant', '<|endoftext|>', and '<|latent_pad|>' 
-    labels = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_token_pattern, end_pad_token_idx, latent_token_idx)
-    batch["labels"] = labels
-
-    # return a mask where tokens of <|latent_pad|> are 1, else 0
-    image_out_mask = mask_image_output_tokens(batch["input_ids"], latent_start_idx, latent_token_idx)
-    batch["image_out_mask"] = image_out_mask
-
-    return batch
-
-def collate_fn_stage2(examples):
-    texts = [processor.apply_chat_template(example, tokenize=False) for example in examples]
-    
-    texts = [place_input_image(text) for text in texts]
-    texts = [place_output_image(text) for text in texts]
-    # replace <|vision_start|><|image_pad|><|vision_end|> with <abs_vis_token><|image_pad|></abs_vis_token> after each <|im_start|>assistant
-    texts = replace_visual_spectial_tokens(texts)
-    
-    image_inputs, _ = process_vision_info(examples)
-
-    user_examples = remove_assistant_images(examples)
-    user_text = [processor.apply_chat_template(example, tokenize=False) for example in user_examples]
-    user_text = replace_visual_spectial_tokens(user_text)
-    user_image_inputs, _ = process_vision_info(user_examples)
-    user_batch = processor(text=user_text, images=user_image_inputs, return_tensors="pt", padding=True)
-
-    batch = processor(text=texts, images=image_inputs, return_tensors="pt", padding=True)
-    
-    batch['pixel_values'] = user_batch['pixel_values']
-    batch['image_grid_thw'] = user_batch['image_grid_thw']
-
-    latent_token_idx = processor.tokenizer("<|latent_pad|>", return_tensors="pt")["input_ids"][0]
-    latent_start_idx = processor.tokenizer("<|latent_start|>", return_tensors="pt")["input_ids"][0]
-    latent_end_idx = processor.tokenizer("<|latent_end|>", return_tensors="pt")["input_ids"][0]
-
-    end_pad_token_idx = processor.tokenizer("<|endoftext|>", return_tensors="pt")["input_ids"][0]
-
-    new_input_ids, new_attention_mask = process_batch(batch["input_ids"], batch["attention_mask"], 
-                                                      latent_start_idx, latent_end_idx, latent_token_idx, args.latent_size, end_pad_token_idx)
-
-    batch["input_ids"] = new_input_ids
-    batch["attention_mask"] = new_attention_mask
-
-    answer_start_token_pattern = processor.tokenizer("<|im_start|>assistant", return_tensors="pt")["input_ids"][0]
-
-    labels = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_token_pattern, end_pad_token_idx, latent_token_idx)
-    batch["labels"] = labels
-    
-    return batch
 
 def collate_fn_avt_stage1(examples, alignment="boxed_start"):
     batch_assistant_img_cnts = [sum(1 for step in example[2]['content'] if step["type"] == "image") for example in examples]
@@ -469,7 +374,7 @@ else:
 
 exp_name = f"ep{args.epochs}-bsz{args.bsz}-lr{1e-5}"
 if args.stage == 'avt_stage1':
-    exp_name += f"-{args.min_latent_size}-{args.min_latent_compress_factor}-{args.max_latent_compress_factor}"
+    exp_name += f"-{args.min_latent_size}-{args.min_latent_compress_factor}-{args.max_latent_compress_factor}-wt{args.alignment_weight}"
     exp_name = f"{args.alignment}-" + exp_name
 exp_name = args.stage+'-'+exp_name
 if args.shuffle_train:
@@ -485,13 +390,7 @@ save_dir = f"./checkpoints/{exp_name}"
 if args.save_model_path != './checkpoints/':
     save_dir = args.save_model_path
 
-if args.stage in ['stage1']:
-    CustomTrainer = CustomTrainerStage1
-    collate_fn = collate_fn_stage1
-elif args.stage in ['stage2']:
-    CustomTrainer = CustomTrainerStage2
-    collate_fn = collate_fn_stage2
-elif args.stage in ['avt_stage1']:
+if args.stage in ['avt_stage1']:
     CustomTrainer = CustomTrainerAVTStage1
     collate_fn = partial(collate_fn_avt_stage1, alignment=args.alignment)
 elif args.stage == 'avt_sft':
@@ -545,6 +444,8 @@ if args.stage == 'avt_sft':
     setattr(training_args, 'observation_ce_factor', args.observation_ce_factor)
     setattr(training_args, 'observation_ce_warmup_steps', args.observation_ce_warmup_steps)
     setattr(training_args, 'exp_name', exp_name)
+elif args.stage == 'avt_stage1':
+    setattr(training_args, 'alignment_weight', args.alignment_weight)
 
 # Initialize the trainer (callbacks that need trainer instance will be added after)
 trainer = CustomTrainer(

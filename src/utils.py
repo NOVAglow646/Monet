@@ -12,29 +12,39 @@ from PIL import Image
 
 def get_args():
     parser = argparse.ArgumentParser()
-    
-    parser.add_argument("--model", type=str, default='Qwen/Qwen2.5-VL-7B-Instruct')
-    parser.add_argument("--stage", type=str, default="stage1")
+    # ===== Basic arguments =====
+    parser.add_argument("--load_model_path", type=str, default='./checkpoints/model_stage1')
+    parser.add_argument("--data_path", type=str, default='PathToJsonlData', nargs='+')
+    parser.add_argument("--stage", type=str, default="avt_stage1", choices=['avt_sft', 'avt_stage1'])
     parser.add_argument("--task", type=str, default="vsp-spatial-reasoning", choices=["vsp-spatial-reasoning", "vsp-spatial-planning", "blink-jigsaw", "sat", "mm-reasoning"])
+    parser.add_argument("--save_model_path", type=str, default='./checkpoints/',help="Path to save the model checkpoints.")
+    parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
+    parser.add_argument("--dataset_root", type=str, default="./new", help="Root directory for the dataset.")
+    parser.add_argument("--deepspeed", type=str, default="",
+                        help="Path to DeepSpeed config JSON, e.g., ./deepspeed/ds_zero2_cpu_offload.json")
+    
+    # ===== Basic training hyperparameters =====
+    parser.add_argument("--bsz", type=int, default=1, help="Batch size for training.")
+    parser.add_argument("--grad_accum_steps", type=int, default=4, help="Gradient accumulation steps.")
+    parser.add_argument("--epochs", type=int, default=10)  
+    parser.add_argument("--shuffle_train", action='store_true', default=False, help="Whether to shuffle the training dataset.")
 
+    # ===== AVT SFT arguments =====
+    parser.add_argument("--observation_ce_factor", default=1.0, type=float)
+    parser.add_argument("--observation_ce_warmup_steps", default=50, type=int)
+
+    # ===== AVT stage1 arguments =====
     parser.add_argument("--latent_size", type=int, default=4)
     parser.add_argument("--min_latent_size", type=int, default=6, help="AVT minimum latent size")
     parser.add_argument("--min_latent_compress_factor", type=int, default=10, help="the minimum of the range of the AVT compress factor")
     parser.add_argument("--max_latent_compress_factor", type=int, default=20, help="the maximum of the range of the AVT compress factor")
-    parser.add_argument("--compress_strategy", type=str, default='average', choices=['average'])
-    parser.add_argument("--bsz", type=int, default=1, help="Batch size for training.")
-    parser.add_argument("--grad_accum_steps", type=int, default=4, help="Gradient accumulation steps.")
-    parser.add_argument("--epochs", type=int, default=10)   
-    parser.add_argument("--shuffle_train", action='store_true', default=False, help="Whether to shuffle the training dataset.")
-    parser.add_argument("--data_path", type=str, default='PathToJsonlData', nargs='+')    
-    parser.add_argument("--log_file", type=str, default='./log.txt')
-    parser.add_argument("--load_model_path", type=str, default='./checkpoints/model_stage1')
-    parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
-    #parser.add_argument("--devices", type=str, nargs='+', default=['cuda:0'])
+    parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in avt_stage1.")
+    parser.add_argument("--alignment", type=str, default="observation_all", choices=["observation_end", "boxed_start", "observation_all"], help="The alignment strategy for AVT.")
 
-    parser.add_argument("--add_reflection", action='store_true', default=False, help="Whether to add reflection in the assistant's response.")
-    parser.add_argument("--alignment", type=str, default="observation_end", choices=["observation_end", "boxed_start", "observation_all"], help="The alignment strategy for AVT.")
-    parser.add_argument("--dataset_root", type=str, default="./new", help="Root directory for the dataset.")
+    # ===== Training record arguments =====
+    parser.add_argument("--log_file", type=str, default='./log.txt')
+    parser.add_argument("--wandb_name", default=None, help="Name for the Weights & Biases run. If None, no W&B logging is done.")
+
     # ===== SFT representation analysis related arguments =====
     parser.add_argument("--sft_analysis_enable", action='store_true', default=False,
                         help="Enable tracking cosine similarity between baseline (pre-SFT) and current hidden states on a sampled subset.")
@@ -49,11 +59,7 @@ def get_args():
     parser.add_argument("--sft_analysis_categories", type=str, nargs='+', default=["boxed_start_poss","observation_poss"],
                         help="Token position categories to aggregate: boxed_start_poss, observation_poss, non_observation_poss.")
     # DeepSpeed config path (optional). If provided, Trainer will enable DeepSpeed with this config.
-    parser.add_argument("--deepspeed", type=str, default="",
-                        help="Path to DeepSpeed config JSON, e.g., ./deepspeed/ds_zero2_cpu_offload.json")
-    parser.add_argument("--save_model_path", type=str, default='./checkpoints/',help="Path to save the model checkpoints.")
-    parser.add_argument("--observation_ce_factor", default=1.0, type=float)
-    parser.add_argument("--observation_ce_warmup_steps", default=50, type=int)
+
     return parser.parse_args()
 
 def seed_everything(seed: int = 42):

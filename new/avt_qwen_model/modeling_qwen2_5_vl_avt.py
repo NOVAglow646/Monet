@@ -26,7 +26,7 @@
 
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Union, List
-
+from contextlib import nullcontext
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -1474,17 +1474,24 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                         seg_att_m   = attn_mask_s[:, :pos] if attn_mask_s is not None else None
 
                         #print("[Non latent seg - before forward] ", cache_kv_shapes(past_kv))
-                        seg_out = self.language_model(
-                            input_ids=None,
-                            inputs_embeds=seg_embeds,
-                            position_ids=seg_pos_ids,
-                            attention_mask=seg_att_m,
-                            past_key_values=past_kv,
-                            use_cache=True,
-                            output_hidden_states=True,
-                            return_dict=True,
-                            **kwargs,
-                        )
+                        if (align_ptr < len(align_pos) and align_pos[align_ptr] < pos):
+                            ctx = nullcontext()
+                            #print(f"Found alignment positions, require grad for this segment of len {pos - prev_idx}")
+                        else: 
+                            ctx = torch.no_grad() # only require grad for segments with alignment positions
+                            #print(f"No alignment positions, use torch.no_grad for this segment of len {pos - prev_idx}")
+                        with ctx:
+                            seg_out = self.language_model(
+                                input_ids=None,
+                                inputs_embeds=seg_embeds,
+                                position_ids=seg_pos_ids,
+                                attention_mask=seg_att_m,
+                                past_key_values=past_kv,
+                                use_cache=True,
+                                output_hidden_states=True,
+                                return_dict=True,
+                                **kwargs,
+                            )
                         #print("[Non latent seg - after forward] ", cache_kv_shapes(past_kv))
                         num_layers = len(seg_out.hidden_states)
                         hidden_states_layers = [[] for _ in range(num_layers)]

@@ -123,14 +123,10 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 export TOKENIZERS_PARALLELISM=false
 # Use torchrun to enable proper distributed/DeepSpeed setup; avoids accidental nn.DataParallel wrapping
 torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
-    --model "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct-0812-avt_sft-shuffle" \
-    --epochs 10 \
+    --epochs 2 \
     --bsz 1 \
     --grad_accum_steps 16 \
     --task "mm-reasoning" \
-    --min_latent_size 6 \
-    --min_latent_compress_factor 30 \
-    --max_latent_compress_factor 40 \
     --stage "avt_stage1" \
     --data_path "./new/created_dataset/filtered_data/CoF/filtered_train.json" \
     "./new/created_dataset/filtered_data/CoM_w_MathVista/filtered_train.json" \
@@ -143,5 +139,9 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     "./new/created_dataset/filtered_data/VTS_1/filtered_train.json" \
     --log_file "./log.txt" \
     --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct-0812-avt_sft-shuffle" \
+    --min_latent_size 6 \
+    --min_latent_compress_factor 30 \
+    --max_latent_compress_factor 40 \
+    --alignment_weight 2.0 \
     --alignment "observation_all" \
     --deepspeed ./deepspeed/ds_zero2_gpu.json 
