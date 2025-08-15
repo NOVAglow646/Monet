@@ -121,20 +121,13 @@ conda activate mirage
 cd /home/dids/shiyang/codes/abstract-visual-token
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 export TOKENIZERS_PARALLELISM=false
-# Use torchrun to enable proper distributed/DeepSpeed setup; avoids accidental nn.DataParallel wrapping
 torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     --epochs 2 \
     --bsz 1 \
     --grad_accum_steps 16 \
     --task "mm-reasoning" \
     --stage "avt_stage1" \
-    --data_path "./new/created_dataset/filtered_data/CoF/filtered_train.json" \
-    "./new/created_dataset/filtered_data/CoM_w_MathVista/filtered_train.json" \
-    "./new/created_dataset/filtered_data/PixelReasoner/filtered_train.json" \
-    "./new/created_dataset/filtered_data/ReFocus/filtered_train.json" \
-    "./new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train.json" \
-    "./new/created_dataset/filtered_data/Zebra_CoT_visual_search/filtered_train.json" \
-    "./new/created_dataset/filtered_data/Zebra_CoT_geometry/filtered_train.json" \
+    --data_path \
     "./new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train.json" \
     "./new/created_dataset/filtered_data/VTS_1/filtered_train.json" \
     --log_file "./log.txt" \

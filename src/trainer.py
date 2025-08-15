@@ -48,7 +48,7 @@ class CustomTrainerAVTStage1(SFTTrainer):
     def __init__(self, *args, **kwargs): 
         self.exp_name =kwargs.pop('exp_name')
         super().__init__(*args, **kwargs)
-        self.weight = args.alignment_weight
+        self.weight = self.args.alignment_weight
         # 仅 rank‑0 进程写文件，防止多卡重复
         self.is_main_process = (
             not torch.distributed.is_initialized()
@@ -138,6 +138,14 @@ class CustomTrainerAVTStage1(SFTTrainer):
         (student_ce_loss, student_outputs) = super().compute_loss(
                 model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
         )
+        alignment_loss = alignment_loss.to(student_ce_loss.device, dtype=student_ce_loss.dtype)
+
+        # If self.weight might be a tensor on CPU or a list, normalize it
+        if isinstance(self.weight, torch.Tensor):
+            self.weight = self.weight.to(student_ce_loss.device, dtype=student_ce_loss.dtype)
+        else:
+            # cast python float to the same dtype for safety
+            self.weight = student_ce_loss.new_tensor(float(self.weight))
         loss = student_ce_loss + self.weight *alignment_loss
 
         outputs_student_loss = student_ce_loss.item()
@@ -149,6 +157,7 @@ class CustomTrainerAVTStage1(SFTTrainer):
         if self.is_main_process and step > 0 and (step % 20 == 0):
             try:
                 gc.collect()
+                torch.cuda.empty_cache()
                 # DO NOT call torch.cuda.empty_cache() every step; it stalls the GPU.
             except Exception:
                 pass

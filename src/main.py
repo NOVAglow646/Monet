@@ -49,15 +49,12 @@ if _rank == 0:
     # Rewrite deprecated preprocessor.json into video_preprocessor.json by re-saving once
     try:
         processor.save_pretrained(args.load_model_path)
-        wandb.init(project='Latent-Think',entity="Latent-Think",name=args.wandb_name,config={"observation_ce_factor":args.observation_ce_factor,"sft_analysis_ratio":args.sft_analysis_ratio})
+        if args.wandb_name is not None:
+            wandb.init(project='Latent-Think',entity="Latent-Think",name=args.wandb_name,config={"observation_ce_factor":args.observation_ce_factor,"sft_analysis_ratio":args.sft_analysis_ratio})
     except Exception as _e:
         logging.debug(f"Processor save_pretrained skip: {_e}")
 
-if args.stage in ['stage1', 'stage2']:
-    processor.tokenizer.add_tokens("<|latent_pad|>", special_tokens=True)
-    processor.tokenizer.add_tokens("<|latent_start|>", special_tokens=True)
-    processor.tokenizer.add_tokens("<|latent_end|>", special_tokens=True)
-elif args.stage in ['avt_stage1', 'avt_sft']:
+if args.stage in ['avt_stage1', 'avt_sft']:
     processor.tokenizer.add_tokens("<abs_vis_token_pad>", special_tokens=True)
     processor.tokenizer.add_tokens("<abs_vis_token>", special_tokens=True)
     processor.tokenizer.add_tokens("</abs_vis_token>", special_tokens=True)
@@ -410,7 +407,7 @@ training_args = SFTConfig(
     weight_decay=0.01,
     logging_steps=1,
     save_strategy="steps",
-    save_steps=200,
+    save_steps=50,
     save_total_limit=3,
     optim="adamw_torch_fused",
     bf16=True,
@@ -419,7 +416,7 @@ training_args = SFTConfig(
     gradient_checkpointing=True, #False if args.stage == "avt_stage1" else True,
     dataset_text_field="",
     dataset_kwargs={"skip_prepare_dataset": True},
-    report_to=[],
+    report_to=['wandb'] if args.wandb_name is not None else [],
     logging_dir='./logs/',
     logging_strategy='steps',
     # Avoid FLOPs estimation logs (set to False through env if needed)
