@@ -4,11 +4,12 @@ model_path = '/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct'
 model_path = '/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct-avt_sft-shuffle-obs-ce-factor-2.0'
 model_path = '/home/dids/shiyang/checkpoints/08_15-avt_stage1-6-30-40-wt1.0-ep2'
 import PIL.Image
+#import new.avt_qwen_model.vllm.apply_qwen2_5_avt_gpu_model_runner
 from new.AAA_vllm_toolkit.load_and_gen_vllm import *
 from new.AAA_vllm_toolkit.load_and_gen_hf import *
 import os
 import PIL
-from new.avt_qwen_model.vllm import apply_qwen2_5_avt_gpu_model_runner
+
 
 
 def main():
@@ -17,8 +18,8 @@ def main():
         mllm, sampling_params = vllm_mllm_init(model_path, tp=4, gpu_memory_utilization=0.15)
         processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
         # inputs = vllm_mllm_process_single_data("Describe this image in detail.", image_path='/data1/qxwang/codes/Mirage/new/debug_1.jpg', mllm_dir=model_path)
-        os.environ['ABS_VIS_START_ID'] = str(processor.tokenizer.encode('<abs_vis_token>')[0])
-        os.environ['ABS_VIS_END_ID'] = str(processor.tokenizer.encode('</abs_vis_token>')[0])
+        os.environ['ABS_VIS_START_ID'] = str(processor.tokenizer.encode('<|vision_start|>')[0])
+        os.environ['ABS_VIS_END_ID'] = str(processor.tokenizer.encode('<|vision_end|>')[0])
         conversation = [
             {
                 "role": "user",

@@ -74,8 +74,8 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
   --log_file "./log.txt" \
   --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
-  --observation_ce_factor 3.0 \
-  --observation_ce_warmup_steps 100 
+  --ce_emphasize_factor 3.0 \
+  --ce_emphasize_warmup_steps 100 
 
 
 export CUDA_HOME=/usr/local/cuda-12.6
@@ -131,6 +131,6 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     --min_latent_compress_factor 30 \
     --max_latent_compress_factor 40 \
     --alignment_weight 2.0 \
+    --ce_emphasize_factor 3.0 \
     --alignment "observation_all" \
-    --deepspeed ./deepspeed/ds_zero2_gpu.json \
-    --wandb_name=test_qixun
+    --deepspeed ./deepspeed/ds_zero2_gpu.json

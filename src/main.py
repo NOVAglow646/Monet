@@ -50,7 +50,7 @@ if _rank == 0:
     try:
         processor.save_pretrained(args.load_model_path)
         if args.wandb_name is not None:
-            wandb.init(project='Latent-Think',entity="Latent-Think",name=args.wandb_name,config={"observation_ce_factor":args.observation_ce_factor,"sft_analysis_ratio":args.sft_analysis_ratio})
+            wandb.init(project='Latent-Think',entity="Latent-Think",name=args.wandb_name,config={"ce_emphasize_factor":args.ce_emphasize_factor,"sft_analysis_ratio":args.sft_analysis_ratio})
     except Exception as _e:
         logging.debug(f"Processor save_pretrained skip: {_e}")
 
@@ -268,6 +268,17 @@ def collate_fn_avt_stage1(examples, alignment="boxed_start"):
                     poss_of_a_sample.extend(list(range(start, end + 1)))
             batch["teacher_alignment_poss"].append(poss_of_a_sample)
 
+    latent_start_poss = find_ids_poss(batch["student_input_ids"], answer_start_token_pattern, latent_start_idx)
+    latent_end_poss = find_ids_poss(batch["student_input_ids"], answer_start_token_pattern, latent_end_idx)
+    batch["ce_emphasize_poss"] = []
+    for start_poss, end_poss in zip(latent_start_poss, latent_end_poss):
+        poss_of_a_sample = []
+        if len(start_poss) > 0 and len(end_poss) > 0:
+            assert len(start_poss) == len(end_poss), f"start_poss: {start_poss}, end_poss: {end_poss}"
+            poss_of_a_sample.extend(start_poss)
+            poss_of_a_sample.extend(end_poss)
+        batch["ce_emphasize_poss"].append(poss_of_a_sample)
+
     # mask tokens of '<|im_start|>assistant', '<|endoftext|>', and '<abs_vis_token_pad>' 
     batch["student_labels"] = generate_labels_after_multi_token_start(batch["student_input_ids"], answer_start_token_pattern, ignore_ids=[end_pad_token_idx, latent_token_idx])
 
@@ -391,7 +402,7 @@ for data_path in args.data_path:
     dataset_name = data_path.split("/")[-2]
     dataset_names += f"-{dataset_name}"
 if args.stage == "avt_sft":
-    exp_name += f"-obs_ce_{args.observation_ce_factor}-warmup_{args.observation_ce_warmup_steps}"
+    exp_name += f"-obs_ce_{args.ce_emphasize_factor}-warmup_{args.ce_emphasize_warmup_steps}"
 
 save_dir = f"./checkpoints/{exp_name}"
 if args.save_model_path != './checkpoints/':
@@ -448,10 +459,11 @@ if args.stage == 'avt_sft':
     setattr(training_args, 'sft_analysis_save_dir', args.sft_analysis_save_dir)
     setattr(training_args, 'sft_analysis_categories', args.sft_analysis_categories)
     setattr(training_args, 'dataset_names', dataset_names)
-    setattr(training_args, 'observation_ce_factor', args.observation_ce_factor)
-    setattr(training_args, 'observation_ce_warmup_steps', args.observation_ce_warmup_steps)
+    setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
+    setattr(training_args, 'ce_emphasize_warmup_steps', args.ce_emphasize_warmup_steps)
     setattr(training_args, 'exp_name', exp_name)
 elif args.stage == 'avt_stage1':
+    setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
     setattr(training_args, 'alignment_weight', args.alignment_weight)
 
 # Initialize the trainer (callbacks that need trainer instance will be added after)

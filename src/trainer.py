@@ -49,6 +49,7 @@ class CustomTrainerAVTStage1(SFTTrainer):
         self.exp_name =kwargs.pop('exp_name')
         super().__init__(*args, **kwargs)
         self.weight = self.args.alignment_weight
+        self.ce_emphasize_factor: float = float(getattr(self.args, 'ce_emphasize_factor', 1.0))
         # 仅 rank‑0 进程写文件，防止多卡重复
         self.is_main_process = (
             not torch.distributed.is_initialized()
@@ -140,6 +141,7 @@ class CustomTrainerAVTStage1(SFTTrainer):
         inputs['latent_mode'] = False
         inputs['ce_patch_pos'] = student_outputs.ce_patch_pos
         inputs['ce_patch_vec'] = student_outputs.ce_patch_vec
+        inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         #logging.info("Computing student ce loss...")
         (student_ce_loss, student_outputs) = super().compute_loss(
@@ -217,11 +219,11 @@ class CustomTrainerSFT(SFTTrainer):
             kwargs['processing_class'] = kwargs.pop('tokenizer')
         super().__init__(*args, **kwargs)
         self.weight = 1.0
-        # observation_ce_factor warmup configuration
+        # ce_emphasize_factor warmup configuration
         # Target factor (backward compatible with existing arg name)
-        self._obs_ce_target: float = float(getattr(self.args, 'observation_ce_factor', 1.0))
+        self._ce_emphasize_target: float = float(getattr(self.args, 'ce_emphasize_factor', 1.0))
         # Optional absolute warmup steps takes precedence over ratio
-        self._obs_ce_warmup_steps: int = int(getattr(self.args, 'observation_ce_warmup_steps', 0) or 0)
+        self._ce_emphasize_warmup_steps: int = int(getattr(self.args, 'ce_emphasize_warmup_steps', 0) or 0)
 
         # Helper: compute total training steps if needed (may be updated later, so compute on demand as well)
         def _estimate_total_steps() -> int:
@@ -239,7 +241,7 @@ class CustomTrainerSFT(SFTTrainer):
                 pass
             return 0
 
-        self._obs_ce_total_steps_hint = _estimate_total_steps()
+        self._ce_emphasize_total_steps_hint = _estimate_total_steps()
         # Representation analysis
         self.rep_analyzer = None
         args_cfg = self.args
@@ -274,18 +276,18 @@ class CustomTrainerSFT(SFTTrainer):
                     "loss_teacher_ce"
                 ])
 
-    def _current_observation_ce_factor(self) -> float:
+    def _current_ce_emphasize_factor(self) -> float:
         """Linear warmup from 1.0 -> target over N steps or ratio of total steps.
 
-        Priority: observation_ce_warmup_steps (absolute) > observation_ce_warmup_ratio > no warmup.
+        Priority: ce_emphasize_warmup_steps (absolute) > ce_emphasize_warmup_ratio > no warmup.
         After warmup, clamp to target. If target <= 1.0, return target directly.
         """
-        target = float(self._obs_ce_target)
+        target = float(self._ce_emphasize_target)
         if target == 1.0:
             return 1.0
 
         # Decide warmup steps
-        warmup_steps = int(self._obs_ce_warmup_steps or 0)
+        warmup_steps = int(self._ce_emphasize_warmup_steps or 0)
 
         if warmup_steps <= 0:
             # No warmup configured or cannot determine steps
@@ -312,11 +314,10 @@ class CustomTrainerSFT(SFTTrainer):
         for k in ['boxed_start_poss','observation_poss','non_observation_poss']:
             if k in inputs:
                 poss_dict[k] = inputs[k]
-        sft_analysis_poss = poss_dict
         inputs['ce_emphasize_poss'] = inputs['observation_poss']
         # Dynamic warmup factor passed to model.forward
-        inputs['observation_ce_factor'] = self._current_observation_ce_factor()
-        #print("Observation CE Factor:", inputs['observation_ce_factor'])
+        inputs['ce_emphasize_factor'] = self._current_ce_emphasize_factor()
+        #print("Observation CE Factor:", inputs['ce_emphasize_factor'])
         (teacher_ce_loss, teacher_outputs) = super().compute_loss(
                 model, 
                 inputs,
@@ -332,11 +333,9 @@ class CustomTrainerSFT(SFTTrainer):
                     for b, sid in enumerate(sample_ids):
                         sid_int = int(sid)
                         if self.rep_analyzer.is_tracked(sid_int):
-                            # positions dict from inputs['sft_analysis_poss'] per sample index b
-                            poss_all = inputs.get('sft_analysis_poss', {})
                             # expect each value is List[List[int]] of length B
                             pos_dict = {}
-                            for cat, batch_poss in poss_all.items():
+                            for cat, batch_poss in poss_dict.items():
                                 if isinstance(batch_poss, (list, tuple)) and len(batch_poss) > b:
                                     pos_dict[cat] = batch_poss[b]
                             # Build baseline lazily first time

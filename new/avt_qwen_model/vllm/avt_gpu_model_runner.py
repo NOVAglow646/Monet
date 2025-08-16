@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
-
+print("Replaced the original vllm gpu_model_runner with the AVT version.")
 import copy
 import gc
 import time
@@ -326,6 +326,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # Only effective for multimodal models on single PP rank (first==last).
         start_id = os.getenv("ABS_VIS_START_ID")
         end_id = os.getenv("ABS_VIS_END_ID")
+        print(f"start_id={start_id} end_id={end_id}")
         try:
             self.abs_vis_start_id: Optional[int] = (
                 int(start_id) if start_id is not None else None)

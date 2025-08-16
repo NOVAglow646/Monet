@@ -29,9 +29,9 @@ def get_args():
     parser.add_argument("--epochs", type=int, default=10)  
     parser.add_argument("--shuffle_train", action='store_true', default=False, help="Whether to shuffle the training dataset.")
 
-    # ===== AVT SFT arguments =====
-    parser.add_argument("--observation_ce_factor", default=1.0, type=float)
-    parser.add_argument("--observation_ce_warmup_steps", default=50, type=int)
+    # ===== AVT SFT & AVT stage1 arguments =====
+    parser.add_argument("--ce_emphasize_factor", default=1.0, type=float)
+    parser.add_argument("--ce_emphasize_warmup_steps", default=50, type=int)
 
     # ===== AVT stage1 arguments =====
     parser.add_argument("--latent_size", type=int, default=4)
