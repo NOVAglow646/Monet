@@ -8,6 +8,7 @@ MIN_LATENT_COMPRESS_FACTOR=30
 MAX_LATENT_COMPRESS_FACTOR=40
 ALIGNMENT_WEIGHT=2.0
 ALIGNMENT=observation_all
+CE_EMPHASIZE_FACTOR=3.0
 
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
@@ -31,11 +32,11 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/VTS_1/filtered_train_new.json" \
   --log_file "./log.txt" \
   --load_model_path "path to your sft ckpt" \
-  --save_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_stage1/08_15-avt_stage1-${MIN_LATENT_SIZE}-${MIN_LATENT_COMPRESS_FACTOR}-${MAX_LATENT_COMPRESS_FACTOR}-wt${ALIGNMENT_WEIGHT} \
+  --save_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_stage1/08_15-avt_stage1-${MIN_LATENT_SIZE}-${MIN_LATENT_COMPRESS_FACTOR}-${MAX_LATENT_COMPRESS_FACTOR}-wt${ALIGNMENT_WEIGHT}-ce_emphasize${CE_EMPHASIZE_FACTOR} \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
   --min_latent_size=${MIN_LATENT_SIZE} \
   --min_latent_compress_factor=${MIN_LATENT_COMPRESS_FACTOR} \
   --max_latent_compress_factor=${MAX_LATENT_COMPRESS_FACTOR} \
   --alignment_weight=${ALIGNMENT_WEIGHT} \
   --alignment=${ALIGNMENT} \
-  --wandb_name=08_15-avt_stage1-${MIN_LATENT_SIZE}-${MIN_LATENT_COMPRESS_FACTOR}-${MAX_LATENT_COMPRESS_FACTOR}-wt${ALIGNMENT_WEIGHT}
+  --wandb_name=08_15-avt_stage1-${MIN_LATENT_SIZE}-${MIN_LATENT_COMPRESS_FACTOR}-${MAX_LATENT_COMPRESS_FACTOR}-wt${ALIGNMENT_WEIGHT}-ce_emphasize${CE_EMPHASIZE_FACTOR}
