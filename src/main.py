@@ -392,7 +392,7 @@ else:
 
 exp_name = f"ep{args.epochs}-bsz{args.bsz}-lr{1e-5}"
 if args.stage == 'avt_stage1':
-    exp_name += f"-{args.min_latent_size}-{args.min_latent_compress_factor}-{args.max_latent_compress_factor}-wt{args.alignment_weight}"
+    exp_name += f"-{args.min_latent_size}-{args.min_latent_compress_factor}-{args.max_latent_compress_factor}-wt{args.alignment_weight}-ce_emphasize_{args.ce_emphasize_factor}"
     exp_name = f"{args.alignment}-" + exp_name
 exp_name = args.stage+'-'+exp_name
 if args.shuffle_train:
@@ -402,7 +402,7 @@ for data_path in args.data_path:
     dataset_name = data_path.split("/")[-2]
     dataset_names += f"-{dataset_name}"
 if args.stage == "avt_sft":
-    exp_name += f"-obs_ce_{args.ce_emphasize_factor}-warmup_{args.ce_emphasize_warmup_steps}"
+    exp_name += f"-ce_emphasize_{args.ce_emphasize_factor}-warmup_{args.ce_emphasize_warmup_steps}"
 
 save_dir = f"./checkpoints/{exp_name}"
 if args.save_model_path != './checkpoints/':
