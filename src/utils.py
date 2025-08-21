@@ -169,13 +169,14 @@ def replace_visual_spectial_tokens(texts):
         
     return update_texts
 
-def replace_visual_spectial_tokens_avt(texts):
+def replace_visual_spectial_tokens_avt(texts, latent_size, latent_pad_str="<abs_vis_token_pad>"):
     update_texts = []
+    latent_pad_strs = latent_pad_str*latent_size
     for i, text in enumerate(texts):
         turns = text.split("<|im_start|>assistant")
         upd_text = turns[0]
         for turn in turns[1:]:
-            upd_text += "<|im_start|>assistant" + turn.replace("<|vision_start|><|image_pad|><|vision_end|>", "<abs_vis_token><|image_pad|></abs_vis_token>")
+            upd_text += "<|im_start|>assistant" + turn.replace("<|vision_start|><|image_pad|><|vision_end|>", f"<abs_vis_token>{latent_pad_strs}</abs_vis_token>")
         update_texts.append(upd_text)
     return update_texts
 

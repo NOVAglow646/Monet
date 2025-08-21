@@ -155,3 +155,51 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     --latent_size 6 \
     --ce_emphasize_factor 1.0 \
     --deepspeed ./deepspeed/ds_zero2_gpu.json
+
+#####################################################################
+# AVT v2 stage2
+#####################################################################
+export CUDA_HOME=/usr/local/cuda-12.6
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}
+conda activate mirage
+cd /home/dids/shiyang/codes/abstract-visual-token
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+export TOKENIZERS_PARALLELISM=false
+torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
+    --epochs 2 \
+    --bsz 1 \
+    --grad_accum_steps 16 \
+    --task "mm-reasoning" \
+    --stage "avt_v2_stage2" \
+    --data_path \
+    "./new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train_short3000.json" \
+    --log_file "./log.txt" \
+    --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
+    --latent_size 6 \
+    --ce_emphasize_factor 1.0 \
+    --alignment_weight 1.0 \
+    --deepspeed ./deepspeed/ds_zero2_gpu.json
+
+export CUDA_HOME=/usr/local/cuda-12.6
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}
+conda activate mirage
+cd /home/dids/shiyang/codes/abstract-visual-token
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+export TOKENIZERS_PARALLELISM=false
+torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
+    --epochs 2 \
+    --bsz 1 \
+    --grad_accum_steps 16 \
+    --task "mm-reasoning" \
+    --stage "avt_v2_stage2" \
+    --data_path \
+    "./new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train_short3000.json" \
+    --log_file "./log.txt" \
+    --load_model_path "/home/dids/shiyang/codes/abstract-visual-token/checkpoints/avt_v2_stage2-ep2-bsz1-lr1e-05-latent6-ce_factor$1.0-align_wt1.0/checkpoint-50" \
+    --latent_size 6 \
+    --ce_emphasize_factor 1.0 \
+    --alignment_weight 1.0 \
+    --deepspeed ./deepspeed/ds_zero2_gpu.json \
+    --resume_from_checkpoint 

@@ -119,6 +119,7 @@ class CustomTrainerAVTStage1(SFTTrainer):
         inputs['image_out_mask'] = inputs['teacher_image_out_mask']
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         inputs['loss_type'] = ['ce']
+        
         with torch.no_grad():
             teacher_outputs = model(**inputs, return_dict=True, output_hidden_states=True)
             
@@ -465,6 +466,7 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         """
         Compute training loss and additionally compute token accuracies
         """
+        inputs['stage'] = 'avt_v2_stage1'
         inputs['latent_mode'] = True
         inputs['loss_type'] = []
         outputs = model(**inputs, return_dict=True, output_hidden_states=True)
@@ -507,6 +509,148 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
     def on_epoch_end(self):
         # 注意：HF Trainer 不会自动调用子类自定义的 on_epoch_end；实际汇总通过回调实现。
         return super().on_epoch_end()
+
+class CustomTrainerAVT_V2_Stage2(SFTTrainer):
+    def __init__(self, *args, **kwargs): 
+        self.exp_name =kwargs.pop('exp_name')
+        super().__init__(*args, **kwargs)
+        self.weight = self.args.alignment_weight
+        self.ce_emphasize_factor: float = float(getattr(self.args, 'ce_emphasize_factor', 1.0))
+        # 仅 rank‑0 进程写文件，防止多卡重复
+        self.is_main_process = (
+            not torch.distributed.is_initialized()
+            or torch.distributed.get_rank() == 0
+        )
+
+        # 日志文件路径
+        log_dir = self.args.logging_dir or "./logs"
+        os.makedirs(log_dir, exist_ok=True)
+        timestamp = datetime.datetime.now().isoformat(timespec="seconds")
+        self.loss_log_path = os.path.join(log_dir, f"loss_history_w{self.weight}_{self.exp_name}_{timestamp}.csv")
+
+        # 如果文件不存在，就写表头
+        if self.is_main_process and not os.path.exists(self.loss_log_path):
+            with open(self.loss_log_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    "global_step","epoch",
+                    "loss_total",
+                    "loss_student_ce",
+                    "loss_align"
+                ])
+        
+        self._al_loss_cum = 0.0       # cumulative alignment loss since last log
+        self._al_steps = 0            # number of micro-steps accumulated
+        self._stu_ce_cum = 0.0        # cumulative student CE loss
+        self._stu_ce_steps = 0
+                
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        """
+        Compute training loss and additionally compute token accuracies
+        """
+        inputs['stage'] = 'avt_v2_stage2'
+        inputs['latent_mode'] = True
+        inputs['input_ids'] = inputs['teacher_input_ids']
+        inputs['attention_mask'] = inputs['teacher_attention_mask']
+        inputs['pixel_values'] = inputs['teacher_pixel_values']
+        inputs['image_grid_thw'] = inputs['teacher_image_grid_thw']
+        inputs['labels'] = None
+        inputs['alignment_poss'] = inputs['teacher_alignment_poss']
+        #model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        model.gradient_checkpointing_disable()
+        inputs['loss_type'] = []
+        inputs['output_latent_embeds'] = True
+        with torch.no_grad():
+            teacher_outputs = model(**inputs, return_dict=True, output_hidden_states=True)
+            
+        inputs['latent_mode'] = True
+        inputs['input_ids'] = inputs['student_input_ids']
+        inputs['attention_mask'] = inputs['student_attention_mask']
+        inputs['pixel_values'] = inputs['student_pixel_values']
+        inputs['image_grid_thw'] = inputs['student_image_grid_thw']
+        inputs.pop('labels')
+        inputs['alignment_poss'] = inputs['student_alignment_poss']
+        inputs['teacher_hidden_states_for_alignment'] = teacher_outputs.latent_embeds
+        model.gradient_checkpointing_disable()
+        inputs['loss_type'] = ['alignment']
+        inputs['output_latent_embeds'] = False
+        (alignment_loss, student_outputs) = super().compute_loss(   
+                model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+            )
+ 
+        inputs['latent_mode'] = False
+        inputs['labels'] = inputs['student_labels']
+        inputs['ce_patch_pos'] = student_outputs.ce_patch_pos
+        inputs['ce_patch_vec'] = student_outputs.ce_patch_vec
+        inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        inputs['loss_type'] = ['ce']
+        (student_ce_loss, student_outputs) = super().compute_loss(
+                model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+        )
+        alignment_loss = alignment_loss.to(student_ce_loss.device, dtype=student_ce_loss.dtype)
+
+        # If self.weight might be a tensor on CPU or a list, normalize it
+        if isinstance(self.weight, torch.Tensor):
+            self.weight = self.weight.to(student_ce_loss.device, dtype=student_ce_loss.dtype)
+        else:
+            # cast python float to the same dtype for safety
+            self.weight = student_ce_loss.new_tensor(float(self.weight))
+        loss = student_ce_loss + self.weight *alignment_loss
+
+        outputs_student_loss = student_ce_loss.item()
+
+        # Avoid per-step cache clearing which forces device sync and hurts utilization.
+        # Just release references; optionally run a light GC periodically.
+        del student_outputs, teacher_outputs
+        step = int(getattr(self.state, 'global_step', 0) or 0)
+        if self.is_main_process and step > 0 and (step % 20 == 0):
+            try:
+                gc.collect()
+                torch.cuda.empty_cache()
+                # DO NOT call torch.cuda.empty_cache() every step; it stalls the GPU.
+            except Exception:
+                pass
+        
+        # -------- wandb logging --------
+        al_val = float(alignment_loss.detach().item()) if torch.is_tensor(alignment_loss) else float(alignment_loss)
+        self._al_loss_cum += al_val
+        self._al_steps += 1
+        self._stu_ce_cum += float(student_ce_loss.detach().item())
+        self._stu_ce_steps += 1
+
+        # --------  local logging  --------
+        if self.is_main_process:
+            with open(self.loss_log_path, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    self.state.global_step,
+                    self.state.epoch,
+                    loss.item(),
+                    outputs_student_loss,
+                    alignment_loss.item() if isinstance(alignment_loss, torch.Tensor) else alignment_loss,
+                ])
+        # --------------------------------------------
+        
+        
+        return (loss, None) if return_outputs else loss
+    
+    def log(self, logs: dict, start_time: float | None = None):
+        # Merge our rolling averages into the standard logs once per logging call
+        merged = dict(logs)
+        if self._al_steps > 0:
+            merged["alignment_loss"] = round(self._al_loss_cum / max(1, self._al_steps), 6)
+        if self._stu_ce_steps > 0:
+            merged["student_ce_loss"] = round(self._stu_ce_cum / max(1, self._stu_ce_steps), 6)
+
+        # Reset accumulators after logging so the next window starts fresh
+        self._al_loss_cum = 0.0
+        self._al_steps = 0
+        self._stu_ce_cum = 0.0
+        self._stu_ce_steps = 0
+
+        # Call parent to keep default behavior (console/TB/W&B/etc.)
+        return super().log(merged, start_time)
 
 import weakref
 
