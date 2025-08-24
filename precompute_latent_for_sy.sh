@@ -10,7 +10,7 @@ export TOKENIZERS_PARALLELISM=false
 
 LATENT_SIZE=6
 CE_EMPHASIZE_FACTOR=1.0
-CKPT=08_20-avt_v2_stage1-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}
+CKPT=08_24-avt_v2_stage1-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}
 
 torchrun --nproc-per-node=8 --master-port=29501 -m src.precompute_teacher_latent \
     --bsz 1 \
