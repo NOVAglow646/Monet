@@ -169,7 +169,7 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     "./new/created_dataset/filtered_data/VTS_1/filtered_train_short3000_w_metadata.json" \
     --log_file "./log.txt" \
     --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
-    --latent_size 6 \
+    --latent_size 10 \
     --ce_emphasize_factor 1.0 \
     --deepspeed ./deepspeed/ds_zero2_gpu.json
 

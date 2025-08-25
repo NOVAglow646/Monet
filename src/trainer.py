@@ -471,9 +471,9 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         """
         Compute training loss and additionally compute token accuracies
         """
-        if self.is_main_process:
+        '''if self.is_main_process:
             torch.cuda.synchronize()
-            start_time = time()
+            start_time = time()'''
         inputs['stage'] = 'avt_v2_stage1'
         inputs['latent_mode'] = True
         inputs['loss_type'] = []
