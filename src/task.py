@@ -122,7 +122,11 @@ def avt_single_input_images_preprocess_function(sample, dataset_root=""):
             if content["type"] == "image":
                 #if "image_file_name" not in content:
                 #    print(dataset_root)
-                content["image"] = os.path.join(dataset_root,content.pop("image_file_name")) 
+                img_file_name = content.pop("image_file_name")
+                if "kling_mm" in dataset_root:
+                    img_file_name = img_file_name.replace("created_dataset/filtered_data", "")
+                content["image"] = os.path.join(dataset_root, img_file_name)
+                #content["image"] = content['image_file_name'].replace("created_dataset/filtered_data","/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual")
                 if j>0 and new_step["content"][j-1]["type"] == "text" and step["role"] == "assistant":
                     if "<abs_vis_token></abs_vis_token>" not in new_step["content"][j-1]["text"]:
                         return None
