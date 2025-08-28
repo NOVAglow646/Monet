@@ -26,10 +26,11 @@ import os
 import re
 from typing import Any, Dict, List, Tuple
 
-from AAA_vllm_toolkit.api import get_api_response  # 直接复用现有 API 封装
-from dataset_utils.prompts import (
+from new.AAA_vllm_toolkit.api import get_api_response  # 直接复用现有 API 封装
+from new.dataset_utils.prompts import (
     ALIGN_SYS_PROMPT_w_boxed,
     VTS_examples,
+    examples_pool_exact,
 )
 
 
@@ -56,7 +57,9 @@ _STEP_RE_TPL = r"<STEP_{i}>\s*(.*?)\s*<END_STEP_{i}>"
 
 
 def build_alignment_text(sample: Dict[str, Any]) -> Tuple[str, int]:
-    segs: List[str] = []
+    instruction = "\nPut your final answer within \\boxed{}. If you cannot see relevant visual information to infer the answer from the image, just output \\boxed{None} and don't guess the answer based on your knowledge."
+    question = sample['question'].replace(instruction, '')
+    segs: List[str] = [question]
     for i, h in enumerate(sample.get("helpers", [])):
         segs.append(STEP_START.format(i=i) + h.get("text", "") + STEP_END.format(i=i))
     return "\n".join(segs), len(segs)
@@ -76,19 +79,39 @@ def parse_aligned(text: str) -> List[str]:
 
 
 # ---------------- Prompt 组装 ----------------
-def build_prompts(full_texts: List[str]) -> Tuple[str, List[str]]:
-    """返回 (sys_prompt, usr_prompts)。
+def _format_user_prompt(text: str) -> str:
+    return "Now it's your turn. ## Input: " + text + "\n\n## Your output:"
 
-    这里采用 prompts.py 中的 ALIGN_SYS_PROMPT_w_boxed + 示例 VTS_examples
-    并将每条输入包装为：
-    "Now it's your turn. ## Input: <...>\n\n## Your output:"
+
+def _get_prompts_for_dataset(dataset_name: str) -> Tuple[str, str]:
+    """Return (sys_prompt, examples) from examples_pool_exact by dataset name.
+
+    Fallback to ALIGN_SYS_PROMPT_w_boxed + VTS_examples when not found or malformed.
     """
-    sys_prompt = ALIGN_SYS_PROMPT_w_boxed + "\n" + VTS_examples
-    usr_prompts = [
-        "Now it's your turn. ## Input: " + t + "\n\n## Your output:"
-        for t in full_texts
-    ]
-    return sys_prompt, usr_prompts
+    entry = examples_pool_exact.get(dataset_name)
+    if entry is None:
+        return ALIGN_SYS_PROMPT_w_boxed, VTS_examples
+
+    # Common case: dict with keys 'sys_prompt' and 'examples'
+    if isinstance(entry, dict):
+        sys_p = entry.get("sys_prompt", ALIGN_SYS_PROMPT_w_boxed)
+        ex = entry.get("examples", "")
+        # Some entries might store examples as tuple/list, join them
+        if isinstance(ex, (list, tuple)):
+            ex = "".join(ex)
+        if not isinstance(ex, str):
+            ex = str(ex)
+        return sys_p, ex
+
+    # If entry is a raw string or tuple of examples without explicit sys_prompt
+    if isinstance(entry, (tuple, list)):
+        examples = "".join(map(str, entry))
+        return ALIGN_SYS_PROMPT_w_boxed, examples
+    if isinstance(entry, str):
+        return ALIGN_SYS_PROMPT_w_boxed, entry
+
+    # Unknown type -> fallback
+    return ALIGN_SYS_PROMPT_w_boxed, VTS_examples
 
 
 # ---------------- COT 构建 ----------------
@@ -144,7 +167,7 @@ def main():
     pa.add_argument(
         "--api_model_name",
         required=True,
-        choices=["gemini-2.5-pro", "deepseek-chat"],
+        choices=["gemini-2.5-pro", "deepseek-chat", "deepseek-reasoner"],
         help="which API to use (already implemented in AAA_vllm_toolkit/api.py)",
     )
     pa.add_argument("--batch-size", type=int, default=256)
@@ -164,18 +187,39 @@ def main():
         ft, _ = build_alignment_text(s1)
         full_texts.append(ft)
 
-    # 3) Prompt 与 batch 构建
-    sys_prompt, usr_prompts = build_prompts(full_texts)
+    # 3) 按数据集分组构建 prompts（使用 examples_pool_exact）并调用 API
+    # 分组，保留原顺序索引，便于还原
+    grouped: Dict[str, List[Tuple[int, str]]] = {}
+    for idx, s1 in enumerate(s1_recs):
+        ds = s1.get("dataset_name", "") or "__UNKNOWN__"
+        grouped.setdefault(ds, []).append((idx, full_texts[idx]))
 
-    # 4) API 调用（分批）
-    aligned_texts: List[str] = []
-    for i in range(0, len(usr_prompts), args.batch_size):
-        chunk = usr_prompts[i : i + args.batch_size]
-        print(f"[api_anno] calling API {args.api_model_name} for batch {i}-{i+len(chunk)-1}")
-        resps = get_api_response(
-            args.api_model_name, sys_prompt=sys_prompt, user_prompts=chunk, temperature=0.3
-        )
-        aligned_texts.extend([r.strip() if isinstance(r, str) else "" for r in resps])
+    aligned_pairs: List[Tuple[int, str]] = []  # (original_index, aligned_text)
+    for ds_name, items in grouped.items():
+        sys_p, examples = _get_prompts_for_dataset(ds_name)
+        sys_prompt = f"{sys_p}\n{examples}" if examples else sys_p
+
+        # 分批调用
+        usr_all = [_format_user_prompt(t) for _, t in items]
+        for i in range(0, len(usr_all), args.batch_size):
+            chunk = usr_all[i : i + args.batch_size]
+            idx_chunk = [items[j][0] for j in range(i, min(i + args.batch_size, len(items)))]
+            print(
+                f"[api_anno] calling API {args.api_model_name} | dataset={ds_name} | batch {i}-{i+len(chunk)-1}"
+            )
+            resps = get_api_response(
+                args.api_model_name,
+                sys_prompt=sys_prompt,
+                user_prompts=chunk,
+                temperature=0.3,
+            )
+            # 归并回原索引
+            for k, r in zip(idx_chunk, resps):
+                aligned_pairs.append((k, r.strip() if isinstance(r, str) else ""))
+
+    # 按原顺序重排
+    aligned_pairs.sort(key=lambda x: x[0])
+    aligned_texts = [t for _, t in aligned_pairs]
 
     assert len(aligned_texts) == len(s1_recs), (
         f"response len mismatch: {len(aligned_texts)} vs {len(s1_recs)}"
@@ -183,7 +227,7 @@ def main():
 
     # 5) 解析回对齐 steps，并生成最终 COT
     out_records: List[Dict[str, Any]] = []
-    for s1, al_txt in zip(s1_recs, aligned_texts):
+    for rec_idx, (s1, al_txt) in enumerate(zip(s1_recs, aligned_texts)):
         steps_aligned = parse_aligned(al_txt)
         if len(steps_aligned) != len(s1.get("helpers", [])):
             # 回退到原 helpers 文本
@@ -192,9 +236,22 @@ def main():
         cot = make_final_cot(s1, steps_aligned)
 
         # 保存为 metadata + data 的结构；metadata 至少含 dataset_name
+        # 补充 sample_id：
+        #  - 优先使用原始样本索引 orig_idx；
+        #  - 否则回退到 stage1_id；
+        #  - 再否则使用当前顺序索引（带前缀 fallback-）。
+        sid = s1.get("orig_idx")
+        if sid is None:
+            sid = s1.get("stage1_id")
+        if sid is None:
+            sid = f"fallback-{rec_idx}"
+
         out_records.append(
             {
-                "metadata": {"dataset_name": s1.get("dataset_name", "")},
+                "metadata": {
+                    "dataset_name": s1.get("dataset_name", ""),
+                    "sample_id": sid,
+                },
                 "data": cot,
             }
         )

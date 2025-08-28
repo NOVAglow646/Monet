@@ -12,9 +12,6 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.precompute_teacher_latent
     --stage "avt_v2_precompute_latent" \
     --data_path \
     "./new/created_dataset/filtered_data/CoF/filtered_train_w_metadata.json" \
-    "./new/created_dataset/filtered_data/CoM_w_MathVista/filtered_train_w_metadata.json" \
-    "./new/created_dataset/filtered_data/PixelReasoner/filtered_train_w_metadata.json" \
-    "./new/created_dataset/filtered_data/ReFocus/filtered_train_w_metadata.json" \
     --log_file "./log.txt" \
     --load_model_path /home/dids/shiyang/checkpoints/avt_v2_stage1/${CKPT} \
     --save_model_path ./new/precomputed_teacher_latents/${CKPT} \

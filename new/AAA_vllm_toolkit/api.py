@@ -111,7 +111,7 @@ def get_api_response(api_model_name, sys_prompt, user_prompts, temperature=0.3):
     if api_model_name == "gemini-2.5-pro":
         client = build_gemini_client()
         return get_gemini_response(client, sys_prompt, user_prompts, temperature)
-    elif api_model_name == "deepseek-chat":
+    elif api_model_name in ["deepseek-chat", "deepseek-reasoner"]:
         client = build_deepseek_client()
         return get_deepseek_response(client, sys_prompt, user_prompts, temperature)
     else:

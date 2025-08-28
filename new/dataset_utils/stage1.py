@@ -466,10 +466,11 @@ def parse_com(
                 pts = mani.get("parameters")
                 if pts is not None and len(pts) == 4 and valid_line_pt(pts):
                     # 用户原逻辑：将线约束成水平或垂直
-                    if pts[2] - pts[0] < pts[3] - pts[1]:
-                        pts[2] = pts[0]
-                    else:
-                        pts[3] = pts[1]
+                    if "MathVista" not in sample["image"]:
+                        if pts[2] - pts[0] < pts[3] - pts[1]:
+                            pts[2] = pts[0]
+                        else:
+                            pts[3] = pts[1]
                     helper_img = draw_line(main_img, (pts[0], pts[1]), (pts[2], pts[3]))
                     typ = "line"
                 else:
@@ -978,7 +979,7 @@ def save_images_for_sample(
     out_img_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     # main
-    main_path = out_img_dir / f"{sid}_0.jpg"
+    main_path = out_img_dir / f"{sid}_0_.jpg"
     main_img.save(main_path)
     paths.append(str(main_path))
     # helpers
@@ -988,7 +989,7 @@ def save_images_for_sample(
         if img is None:
             # paths.append(None)
             continue
-        p = out_img_dir / f"{sid}_{idx}.jpg"
+        p = out_img_dir / f"{sid}_{idx}_.jpg"
         img.save(p)
         paths.append(str(p))
         idx += 1

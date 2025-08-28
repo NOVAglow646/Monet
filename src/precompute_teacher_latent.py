@@ -1,6 +1,16 @@
 import os as _early_os
+# Also import standard os for later usages in this file
+import os
+import datetime as _dt
 # Disable parallelism in HuggingFace tokenizers to avoid fork-related warnings/deadlocks
 _early_os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+# Enable faster failure and better logs for NCCL collectives
+_early_os.environ.setdefault("TORCH_NCCL_ASYNC_ERROR_HANDLING", "1")
+# Remove deprecated var in this process to avoid warnings if present
+if "NCCL_ASYNC_ERROR_HANDLING" in _early_os.environ:
+    _early_os.environ.pop("NCCL_ASYNC_ERROR_HANDLING", None)
+_early_os.environ.setdefault("NCCL_DEBUG", "WARN")  # change to INFO for deeper debugging
+_early_os.environ.setdefault("TORCH_NCCL_TRACE_BUFFER_SIZE", "1048576")  # enable flight recorder
 import shutil
 from functools import partial
 import torch
@@ -189,72 +199,97 @@ def main():
     world_size = int(os.environ.get("WORLD_SIZE", "1"))
     is_dist = world_size > 1
     if is_dist and not (dist.is_available() and dist.is_initialized()):
-        dist.init_process_group(backend="nccl")
-    rank = dist.get_rank() if (dist.is_available() and dist.is_initialized()) else 0
-    local_rank = int(os.environ.get("LOCAL_RANK", os.environ.get("RANK", 0)))
+        # Use a generous timeout to avoid false positives on large models
+        dist.init_process_group(backend="nccl", timeout=_dt.timedelta(minutes=30))
+    try:
+        rank = dist.get_rank() if (dist.is_available() and dist.is_initialized()) else 0
+        local_rank = int(os.environ.get("LOCAL_RANK", os.environ.get("RANK", 0)))
 
-    device = _device()
-    model.to(device)
+        device = _device()
+        model.to(device)
 
-    # Save dir for latents
-    out_dir = args.save_model_path
-    os.makedirs(out_dir, exist_ok=True)
+        # Save dir for latents
+        out_dir = args.save_model_path
+        os.makedirs(out_dir, exist_ok=True)
 
-    # Iterate data and precompute
-    bs = max(1, int(getattr(args, 'bsz', 1)))
-    total = len(train_dataset)
-    if rank == 0:
-        logging.info(f"[precompute] total samples={total}, batch_size={bs}, saving to {out_dir}; world_size={world_size}")
+        # Iterate data and precompute
+        bs = max(1, int(getattr(args, 'bsz', 1)))
+        total = len(train_dataset)
+        if is_dist:
+            # Cross-rank consistency check for dataset length; mismatch is a common source of collective hangs
+            try:
+                t = torch.tensor([total], device=device)
+                gathered = [torch.zeros_like(t) for _ in range(world_size)]
+                dist.all_gather(gathered, t)
+                totals = [int(x.item()) for x in gathered]
+                if len(set(totals)) != 1:
+                    if rank == 0:
+                        logging.error(f"[precompute] dataset length mismatch across ranks: {totals}. "
+                                      f"This can lead to deadlocks. Exiting.")
+                    return
+            except Exception as e:
+                if rank == 0:
+                    logging.warning(f"[precompute] total all_gather check failed: {e}")
+        if rank == 0:
+            logging.info(f"[precompute] total samples={total}, batch_size={bs}, saving to {out_dir}; world_size={world_size}")
 
-    # Build index shards per rank
-    indices = list(range(total))
-    if is_dist:
-        per = (total + world_size - 1) // world_size
-        start_idx = rank * per
-        end_idx = min(total, (rank + 1) * per)
-        shard = indices[start_idx:end_idx]
-    else:
-        shard = indices
+        # Build index shards per rank
+        indices = list(range(total))
+        if is_dist:
+            per = (total + world_size - 1) // world_size
+            start_idx = rank * per
+            end_idx = min(total, (rank + 1) * per)
+            shard = indices[start_idx:end_idx]
+        else:
+            shard = indices
 
-    if is_dist:
-        dist.barrier()
+        # Avoid early barriers that can deadlock if any rank errors; not required for independent precompute
 
-    with torch.inference_mode():
-        rng = range(0, len(shard), bs)
-        pbar = tqdm(rng, desc=f"[rank {rank}] precompute", disable=(rank != 0))
-        for i in pbar:
-            cur_ids = shard[i:i+bs]
-            examples = [train_dataset[j] for j in cur_ids]
-            batch = collate_fn_avt_v2_stage2(examples)
-            inputs = {
-                'stage': 'avt_v2_stage2',               # produce latent_embeds as trainer_v2_stage2 expects
-                'latent_mode': True,
-                'input_ids': batch['teacher_input_ids'].to(device),
-                'attention_mask': batch['teacher_attention_mask'].to(device),
-                'pixel_values': batch['teacher_pixel_values'].to(device),
-                'image_grid_thw': batch['teacher_image_grid_thw'].to(device),
-                'labels': None,
-                'alignment_poss': batch['teacher_alignment_poss'],
-                'loss_type': [],
-                'output_latent_embeds': True,
-            }
-            outputs = model(**inputs, return_dict=True)
+        with torch.inference_mode():
+            rng = range(0, len(shard), bs)
+            pbar = tqdm(rng, desc=f"[rank {rank}] precompute", disable=(rank != 0))
+            for i in pbar:
+                cur_ids = shard[i:i+bs]
+                try:
+                    examples = [train_dataset[j] for j in cur_ids]
+                    batch = collate_fn_avt_v2_stage2(examples)
+                    inputs = {
+                        'stage': 'avt_v2_stage2',               # produce latent_embeds as trainer_v2_stage2 expects
+                        'latent_mode': True,
+                        'input_ids': batch['teacher_input_ids'].to(device),
+                        'attention_mask': batch['teacher_attention_mask'].to(device),
+                        'pixel_values': batch['teacher_pixel_values'].to(device),
+                        'image_grid_thw': batch['teacher_image_grid_thw'].to(device),
+                        'labels': None,
+                        'alignment_poss': batch['teacher_alignment_poss'],
+                        'loss_type': [],
+                        'output_latent_embeds': True,
+                    }
+                    outputs = model(**inputs, return_dict=True)
 
-            latents = outputs.latent_embeds
-            # Save per global sample index to avoid collisions
-            B = len(latents)
-            for b in range(B):
-                metadata = batch['metadata'][b]
-                dataset_name = metadata['dataset_name']
-                sample_id = metadata['sample_id']
-                metadata_info = f"{dataset_name}_{sample_id}"
-                save_path = os.path.join(out_dir, f"latent_{metadata_info}.pt")
-                torch.save({'metadata_info': metadata_info, 'latent': latents[b].detach().cpu()}, save_path)
+                    latents = outputs.latent_embeds
+                    # Save per global sample index to avoid collisions
+                    B = len(latents)
+                    for b in tqdm(range(B), desc="Saving latents", total=B):
+                        metadata = batch['metadata'][b]
+                        dataset_name = metadata['dataset_name']
+                        sample_id = metadata['sample_id']
+                        metadata_info = f"{dataset_name}_{sample_id}"
+                        save_path = os.path.join(out_dir, f"latent_{metadata_info}.pt")
+                        torch.save({'metadata_info': metadata_info, 'latent': latents[b].detach().cpu()}, save_path)
+                except Exception as e:
+                    logging.exception(f"[rank {rank}] Failed at batch start={i}, ids={cur_ids}: {e}")
+                    # Continue processing other batches instead of crashing and hanging other ranks
+                    continue
 
-    if is_dist:
-        dist.barrier()
-    if rank == 0:
-        logging.info(f"[precompute] done. Latents saved under: {out_dir}")
+        # Avoid a final barrier; log completion per-rank to prevent deadlocks if any rank terminated early
+        logging.info(f"[precompute] rank {rank} done. Latents saved under: {out_dir}")
+    finally:
+        if is_dist and dist.is_available() and dist.is_initialized():
+            try:
+                dist.destroy_process_group()
+            except Exception as e:
+                logging.warning(f"[precompute] destroy_process_group failed: {e}")
 
 
 if __name__ == "__main__":
