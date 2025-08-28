@@ -23,7 +23,8 @@ def get_args():
     parser.add_argument("--dataset_root", type=str, default="./new", help="Root directory for the dataset.")
     parser.add_argument("--deepspeed", type=str, default="",
                         help="Path to DeepSpeed config JSON, e.g., ./deepspeed/ds_zero2_cpu_offload.json")
-    
+    parser.add_argument("--num_samples", default=-1, help="-1 means all data", type=int)
+
     # ===== Basic training hyperparameters =====
     parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate for training.")
     parser.add_argument("--bsz", type=int, default=1, help="Batch size for training.")
@@ -71,6 +72,8 @@ def get_args():
     parser.add_argument("--teacher_latent_dir", type=str, default=None,
                         help="Directory that stores precomputed teacher latents (files named latent_{sample_id:08d}.pt). If not set, defaults to {save_model_path or ./checkpoints}/teacher_latents.")
     # DeepSpeed config path (optional). If provided, Trainer will enable DeepSpeed with this config.
+    # ===== PPL analysis =====
+    parser.add_argument("--no_question_image", action='store_true', default=False)
 
     return parser.parse_args()
 

@@ -63,16 +63,18 @@ def get_gemini_response(client, sys_prompt, user_prompts, temperature=0.3):
         #     temperature=temperature,
         #     stream=False,
         # )
-        contents = []
-        contents.append(user_prompt)
-        # responses.append(response.choices[0].message.content)
+        # 将系统提示与用户提示同时传入
+        contents = [sys_prompt, user_prompt]
+        # 根据需要覆盖温度
+        gen_cfg = dict(gemini_generation_config)
+        gen_cfg["temperature"] = temperature
         response = gemini_model.generate_content(
             contents,
-            generation_config=gemini_generation_config,
+            generation_config=gen_cfg,
             safety_settings=safety_settings,
         )
-        response = responses.text
-        responses.append(response)
+        text = getattr(response, "text", "")
+        responses.append(text)
     return responses
 
 def build_deepseek_client():

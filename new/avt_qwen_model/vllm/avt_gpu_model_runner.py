@@ -1456,6 +1456,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                             st = self.abs_vis_state.get(req_id)
                             if st and st.get("active"):
                                 st["pending"] = None
+
             inputs_embeds = self.inputs_embeds[:num_input_tokens]
             input_ids = None
         else:
@@ -1652,7 +1653,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 for j, tid in enumerate(gen_ids):
                     if not st["active"] and tid == self.abs_vis_start_id:
                         st["active"] = True
-                    elif st["active"] and tid == self.abs_vis_end_id: #(tid == self.abs_vis_end_id or st["current_len"] > 20):
+                    elif st["active"] and (tid == self.abs_vis_end_id or st["current_len"] > 20):
                         st["active"] = False
                         st["pending"] = None
                         st["current_len"] = 0

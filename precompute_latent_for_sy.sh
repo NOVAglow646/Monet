@@ -29,6 +29,6 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.precompute_teacher_latent
     --log_file "./log.txt" \
     --load_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_v2_stage1/${CKPT} \
     --save_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/precomputed_teacher_latents/${CKPT} \
-    --latent_size 6 \
-    --ce_emphasize_factor 1.0 \
+    --latent_size ${LATENT_SIZE} \
+    --dataset_root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual \
     --deepspeed ./deepspeed/ds_zero2_gpu.json
