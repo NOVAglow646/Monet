@@ -5,10 +5,14 @@ from pathlib import Path
 
 '''
 cd /home/dids/shiyang/codes/abstract-visual-token/new/dataset_utils
-python split_jsonl.py /home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_visual_search/stage1_policy_out.jsonl -n 4
+python split_jsonl.py /home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_maze/stage1_policy_out.jsonl -n 4
+
+cd /home/dids/shiyang/codes/abstract-visual-token/new/dataset_utils
+python split_jsonl.py /home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train_short3000_w_metadata.json -n 4
+
 
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token/new/dataset_utils
-python split_jsonl.py /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_visual_search/stage1_policy_out.jsonl -n 4
+python split_jsonl.py /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_maze/stage1_policy_out.jsonl -n 4
 
 '''
 

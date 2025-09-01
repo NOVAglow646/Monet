@@ -59,6 +59,8 @@ _STEP_RE_TPL = r"<STEP_{i}>\s*(.*?)\s*<END_STEP_{i}>"
 def build_alignment_text(sample: Dict[str, Any]) -> Tuple[str, int]:
     instruction = "\nPut your final answer within \\boxed{}. If you cannot see relevant visual information to infer the answer from the image, just output \\boxed{None} and don't guess the answer based on your knowledge."
     question = sample['question'].replace(instruction, '')
+    instruction = "\nPut your final answer within \\boxed{}."
+    question = question.replace(instruction, '')
     segs: List[str] = [question]
     for i, h in enumerate(sample.get("helpers", [])):
         segs.append(STEP_START.format(i=i) + h.get("text", "") + STEP_END.format(i=i))
@@ -170,7 +172,7 @@ def main():
         choices=["gemini-2.5-pro", "deepseek-chat", "deepseek-reasoner"],
         help="which API to use (already implemented in AAA_vllm_toolkit/api.py)",
     )
-    pa.add_argument("--batch-size", type=int, default=256)
+    pa.add_argument("--batch-size", type=int, default=10000)
     pa.add_argument("--max-records", type=int, default=None)
     args = pa.parse_args()
 

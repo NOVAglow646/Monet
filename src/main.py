@@ -406,7 +406,7 @@ def collate_fn_avt_v2_stage1(examples):
                 poss_of_a_sample.extend(list(range(start, end + 1)))
         batch["observation_poss"].append(poss_of_a_sample)
 
-    batch["labels"] = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, latent_pad_idx, img_pad_idx,  img_start_idx, img_end_idx])
+    batch["labels"] = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, latent_pad_idx, img_pad_idx,  img_start_idx, img_end_idx, observation_start_idx, observation_end_idx])
     '''if _rank==0:
         time_1 = time()
         print(f"collate time {time_1 - start_time}")'''
@@ -479,7 +479,7 @@ def collate_fn_avt_v2_stage2(examples, alignment="boxed_start"):
 
 
     # mask tokens of '<|im_start|>assistant', '<|endoftext|>', and '<abs_vis_token_pad>' 
-    batch["student_labels"] = generate_labels_after_multi_token_start(batch["student_input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, latent_pad_idx])
+    batch["student_labels"] = generate_labels_after_multi_token_start(batch["student_input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, latent_pad_idx, observation_start_idx, observation_end_idx])
 
     return batch
 

@@ -25,7 +25,7 @@ from AAA_vllm_toolkit.load_and_gen_vllm import (
     vllm_generate,
 )
 from AAA_vllm_toolkit.api import get_api_response          # type: ignore
-from dataset_utils.prompts import examples_pool            # type: ignore
+from dataset_utils.prompts import examples_pool_exact            # type: ignore
 
 # ---------- 标签模板 ----------
 STEP_START = "<STEP_{i}>"
@@ -63,7 +63,7 @@ def parse_aligned(text: str) -> List[str]:
 
 # ---------- prompt ----------
 def _prompts(inputs: List[str], ds_name: str):
-    sys_part = examples_pool[ds_name]["sys_prompt"] + examples_pool[ds_name]["examples"]
+    sys_part = examples_pool_exact[ds_name]["sys_prompt"] + examples_pool_exact[ds_name]["examples"]
     return sys_part, [
         "Now it's your turn. ## Input: " + t + "\n\n## Your output:" for t in inputs
     ]

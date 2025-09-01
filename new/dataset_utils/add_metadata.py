@@ -22,19 +22,12 @@ METADATA_KEY = "metadata"        # Change to "meta_data" if needed
 DATA_KEY = "data"
 
 # Default input files if no CLI args are provided
-'''DEFAULT_FILES = [
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/CoF/filtered_train.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/CoM_w_MathVista/filtered_train.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/PixelReasoner/filtered_train.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/ReFocus/filtered_train.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_visual_search/filtered_train.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_geometry/filtered_train.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train_short3000.json",
-    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/VTS_1/filtered_train_short3000.json",
-]'''
-
 DEFAULT_FILES = [
+
+    "/home/dids/shiyang/codes/abstract-visual-token/new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train_short3000.json",
+]
+
+'''DEFAULT_FILES = [
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/CoF/filtered_train.json",
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/CoM_w_MathVista/filtered_train.json",
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/PixelReasoner/filtered_train.json",
@@ -44,7 +37,7 @@ DEFAULT_FILES = [
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_geometry/filtered_train.json",
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_maze/filtered_train_short3000.json",
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/VTS_1/filtered_train_short3000.json",
-]
+]'''
 
 def infer_dataset_name(p: Path) -> str:
     """

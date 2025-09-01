@@ -5,11 +5,11 @@ export NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9
 
 
 LR=0.00001
-LATENT_SIZE=6
+LATENT_SIZE=10
 CE_EMPHASIZE_FACTOR=1.0
 ALIGNMENT_WEIGHT=2.0
 LOAD_CKPT=08_26-avt_v2_stage1-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}
-SAVE_CKPT=08_26-avt_v2_stage2-lr${LR}-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}-align_wt${ALIGNMENT_WEIGHT}
+SAVE_CKPT=08_29-avt_v2_stage2-lr${LR}-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}-align_wt${ALIGNMENT_WEIGHT}
 
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
