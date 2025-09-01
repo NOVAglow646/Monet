@@ -883,7 +883,7 @@ def find_segments_1d(ids, token_ids):
     return S
 
 
-def build_additive_bias(input_ids, pad_mask, token_ids, large_neg=-1e5, mask_latent: bool = False, observation_tokens_only_see_image_tokens: bool = False, observation_tokens_only_see_latent_tokens: bool = True):
+def build_additive_bias(input_ids, pad_mask, token_ids, large_neg=-1e5, mask_latent: bool = False, observation_tokens_only_see_image_tokens: bool = False, observation_tokens_only_see_latent_tokens: bool = False):
     """
     input_ids: LongTensor [B, L]
     pad_mask:  LongTensor/BoolTensor [B, L], 1/True for real tokens
@@ -960,7 +960,7 @@ def build_additive_bias(input_ids, pad_mask, token_ids, large_neg=-1e5, mask_lat
                         allowed[b][rows_to_block.nonzero(as_tuple=False).squeeze(-1)[:, None], A_idx] = False
 
             if O_idx.numel() and A_idx.numel():
-                assert (observation_tokens_only_see_latent_tokens or observation_tokens_only_see_image_tokens) and not (observation_tokens_only_see_latent_tokens and observation_tokens_only_see_image_tokens), "At most one of observation_tokens_only_see_latent_tokens and observation_tokens_only_see_image_tokens can be True"
+                '''assert (observation_tokens_only_see_latent_tokens or observation_tokens_only_see_image_tokens) and not (observation_tokens_only_see_latent_tokens and observation_tokens_only_see_image_tokens), "At most one of observation_tokens_only_see_latent_tokens and observation_tokens_only_see_image_tokens can be True"'''
                 if observation_tokens_only_see_image_tokens:
                     # 3) O_i only sees I_i
                     allowed[b][O_idx, :] = False

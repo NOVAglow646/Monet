@@ -68,12 +68,16 @@ def get_gemini_response(client, sys_prompt, user_prompts, temperature=0.3):
         # 根据需要覆盖温度
         gen_cfg = dict(gemini_generation_config)
         gen_cfg["temperature"] = temperature
-        response = gemini_model.generate_content(
-            contents,
-            generation_config=gen_cfg,
-            safety_settings=safety_settings,
-        )
-        text = getattr(response, "text", "")
+        try:
+            response = gemini_model.generate_content(
+                contents,
+                generation_config=gen_cfg,
+                safety_settings=safety_settings,
+            )
+            text = getattr(response, "text", "")
+        except Exception:
+            # In case of any API error, mark this response as None so caller can drop the sample
+            text = None
         responses.append(text)
     return responses
 
@@ -83,11 +87,11 @@ def build_deepseek_client():
     """
     return OpenAI(api_key="sk-a62bc7c0899a47dba605e3d3ab332e37", base_url="https://api.deepseek.com")
 
-def get_deepseek_response(client, sys_prompt, user_prompts, temperature=0.3):
+def get_deepseek_response(client, sys_prompt, user_prompts, temperature=0.3, model_name="deepseek-chat"):
     """
     Get responses from DeepSeek API for a list of user prompts.
     """
-    model = "deepseek-chat"
+    model = model_name
     responses = []
     for user_prompt in tqdm(
         user_prompts,
@@ -113,6 +117,6 @@ def get_api_response(api_model_name, sys_prompt, user_prompts, temperature=0.3):
         return get_gemini_response(client, sys_prompt, user_prompts, temperature)
     elif api_model_name in ["deepseek-chat", "deepseek-reasoner"]:
         client = build_deepseek_client()
-        return get_deepseek_response(client, sys_prompt, user_prompts, temperature)
+        return get_deepseek_response(client, sys_prompt, user_prompts, temperature, model_name=api_model_name)
     else:
         raise ValueError(f"Unsupported API model name: {api_model_name}")

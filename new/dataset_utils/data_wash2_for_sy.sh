@@ -48,3 +48,14 @@ cd mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token/new/dataset_
 python merge_json.py /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_count/filtered_train_w_metadata_1_9.1.json /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_count/filtered_train_w_metadata_2_9.1.json /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_count/filtered_train_w_metadata_3_9.1.json -o /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_count/filtered_train_w_metadata_9.1.json
 
 
+
+# zebra geo
+
+source /pfs/wangzihao11/miniconda3/bin/activate
+conda activate mirage
+cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
+python -m new.dataset_utils.api_anno_from_filtered_train \
+  --input-json /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_geometry/filtered_train_w_metadata.json \
+  --out-json /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_geometry/filtered_train_w_metadata_9.1.json \
+  --api_model_name gemini-2.5-pro
+

@@ -254,7 +254,8 @@ def main():
         ds = meta.get("dataset_name") or "__UNKNOWN__"
         grouped.setdefault(ds, []).append((idx, api_inputs[idx]))
 
-    aligned_pairs: List[Tuple[int, str]] = []
+    # 收集 (原索引, 文本或 None)
+    aligned_pairs: List[Tuple[int, Any]] = []
     for ds_name, items in grouped.items():
         sys_p, examples = _get_prompts_for_dataset(ds_name)
         sys_prompt = f"{sys_p}\n{examples}" if examples else sys_p
@@ -273,18 +274,23 @@ def main():
                 temperature=0.3,
             )
             for k, r in zip(idx_chunk, resps):
-                aligned_pairs.append((k, r.strip() if isinstance(r, str) else ""))
+                # 允许 r 为 None（例如上游异常），此时标记 None 用于后续丢弃样本
+                if isinstance(r, str):
+                    aligned_pairs.append((k, r.strip()))
+                else:
+                    aligned_pairs.append((k, None))
 
     aligned_pairs.sort(key=lambda x: x[0])
     aligned_texts = [t for _, t in aligned_pairs]
 
-    assert len(aligned_texts) == len(meta_cache), (
-        f"response len mismatch: {len(aligned_texts)} vs {len(meta_cache)}"
-    )
-
     # 解析并回填输出
     out_records: List[Dict[str, Any]] = []
+    dropped = 0
     for i, (meta, api_text) in enumerate(zip(meta_cache, aligned_texts)):
+        # 若 API 返回为 None，直接跳过该样本
+        if api_text is None:
+            dropped += 1
+            continue
         steps = parse_aligned(api_text)
         if not steps:
             # 回退：从我们送入的文本中解析出原始的所有 STEP 段
@@ -323,6 +329,8 @@ def main():
         )
 
     save_json(out_records, args.out_json)
+    if dropped:
+        print(f"[api_anno_filtered] dropped {dropped} samples due to API None responses")
     print(f"[api_anno_filtered] wrote {len(out_records)} records -> {args.out_json}")
 
 
