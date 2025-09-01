@@ -33,16 +33,20 @@ def get_args():
     parser.add_argument("--shuffle_train", action='store_true', default=False, help="Whether to shuffle the training dataset.")
 
     # ===== AVT SFT & AVT stage1 arguments =====
-    parser.add_argument("--ce_emphasize_factor", default=1.0, type=float)
     parser.add_argument("--ce_emphasize_warmup_steps", default=50, type=int)
 
     # ===== AVT stage1 arguments =====
-    parser.add_argument("--latent_size", type=int, default=4)
     parser.add_argument("--min_latent_size", type=int, default=6, help="AVT minimum latent size")
     parser.add_argument("--min_latent_compress_factor", type=int, default=10, help="the minimum of the range of the AVT compress factor")
     parser.add_argument("--max_latent_compress_factor", type=int, default=20, help="the maximum of the range of the AVT compress factor")
-    parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in avt_stage1.")
     parser.add_argument("--alignment", type=str, default="observation_all", choices=["observation_end", "boxed_start", "observation_all"], help="The alignment strategy for AVT.")
+
+    # ===== AVT v2 stage1 =====
+    parser.add_argument("--latent_size", type=int, default=4)
+    parser.add_argument("--ce_emphasize_factor", default=1.0, type=float)
+
+    # ==== AVT v2 stage2 arguments =====
+    parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in avt_stage1.")
 
     # ===== Training record arguments =====
     parser.add_argument("--log_file", type=str, default='./log.txt')
@@ -62,12 +66,15 @@ def get_args():
     parser.add_argument("--sft_analysis_categories", type=str, nargs='+', default=["boxed_start_poss","observation_poss"],
                         help="Token position categories to aggregate: boxed_start_poss, observation_poss, non_observation_poss.")
     # ===== Eval SFT =====
-    parser.add_argument("--mask_latent", action='store_true', default=False,
-                        help="If set, make latent tokens (A_i) invisible to all subsequent tokens in build_additive_bias.")
     parser.add_argument("--eval_on_teacher_sequence", action='store_true', default=False)
     parser.add_argument("--eval_on_observation_tokens", action='store_true', default=False)
+    
+    # ==== Custom attention =====
+    parser.add_argument("--mask_latent", action='store_true', default=False,
+                        help="If set, make latent tokens (A_i) invisible to all subsequent tokens in build_additive_bias.")
     parser.add_argument("--observation_tokens_only_see_image_tokens", action='store_true', default=False)
     parser.add_argument("--observation_tokens_only_see_latent_tokens", action='store_true', default=False)
+    parser.add_argument("--observation_tokens_cannot_see_question_image", action='store_true', default=False)
     # ===== Precomputed teacher latent loading =====
     parser.add_argument("--teacher_latent_dir", type=str, default=None,
                         help="Directory that stores precomputed teacher latents (files named latent_{sample_id:08d}.pt). If not set, defaults to {save_model_path or ./checkpoints}/teacher_latents.")
@@ -565,7 +572,7 @@ def mask_image_output_tokens(
 
 
 def resize_by_token_budget(images,
-                           global_max_pixels=480*3*28*28,
+                           global_max_pixels=600*3*28*28,
                            per_img_max_pixels=800*28*28,
                            divisor=28):
     """等比缩放，保证一条样本内所有图像像素和 ≤ global_max_pixels"""
@@ -883,7 +890,7 @@ def find_segments_1d(ids, token_ids):
     return S
 
 
-def build_additive_bias(input_ids, pad_mask, token_ids, large_neg=-1e5, mask_latent: bool = False, observation_tokens_only_see_image_tokens: bool = False, observation_tokens_only_see_latent_tokens: bool = False):
+def build_additive_bias(input_ids, pad_mask, token_ids, large_neg=-1e5, mask_latent: bool = False, observation_tokens_only_see_image_tokens: bool = False, observation_tokens_only_see_latent_tokens: bool = False, observation_tokens_cannot_see_question_image: bool = False):
     """
     input_ids: LongTensor [B, L]
     pad_mask:  LongTensor/BoolTensor [B, L], 1/True for real tokens
@@ -971,7 +978,14 @@ def build_additive_bias(input_ids, pad_mask, token_ids, large_neg=-1e5, mask_lat
                     # If mask_latent is enabled, O_i cannot see A_i either; otherwise allow.
                     if not mask_latent:
                         allowed[b][O_idx.unsqueeze(1), A_idx] = True
-
+                if observation_tokens_cannot_see_question_image:
+                    ids = input_ids[b]
+                    question_img_start = torch.nonzero(ids == token_ids['v_start'], as_tuple=False).squeeze(-1)[0]
+                    question_imng_end   = torch.nonzero(ids == token_ids['v_end'],   as_tuple=False).squeeze(-1)[0]
+                    question_img_idx = torch.arange(question_img_start, question_imng_end + 1, device=device)
+                    allowed[b][O_idx.unsqueeze(1), question_img_idx] = False
+                    pass
+                
                 # ② O seg can see itself
                 n = O_idx.numel()
                 ar = torch.arange(n, device=O_idx.device)

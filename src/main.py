@@ -391,6 +391,7 @@ def collate_fn_avt_v2_stage1(examples):
         token_ids=SPECIAL_id,
         large_neg=-1e5,
         mask_latent=getattr(args, 'mask_latent', False),
+        observation_tokens_cannot_see_question_image=getattr(args, 'observation_tokens_cannot_see_question_image', False)
     ) }
 
     
@@ -403,7 +404,7 @@ def collate_fn_avt_v2_stage1(examples):
         if len(start_poss) > 0 and len(end_poss) > 0:
             assert len(start_poss) == len(end_poss), f"start_poss: {start_poss}, end_poss: {end_poss}"
             for start, end in zip(start_poss, end_poss):
-                poss_of_a_sample.extend(list(range(start, end + 1)))
+                poss_of_a_sample.extend(list(range(start+1, end)))
         batch["observation_poss"].append(poss_of_a_sample)
 
     batch["labels"] = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, latent_pad_idx, img_pad_idx,  img_start_idx, img_end_idx, observation_start_idx, observation_end_idx])

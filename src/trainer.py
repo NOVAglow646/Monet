@@ -429,20 +429,8 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
             or torch.distributed.get_rank() == 0
         )
 
-        '''# 日志文件路径
-        log_dir = self.args.logging_dir or "./logs"
-        os.makedirs(log_dir, exist_ok=True)
-        timestamp = datetime.datetime.now().isoformat(timespec="seconds")
-        self.loss_log_path = os.path.join(log_dir, f"loss_history/loss_history_w{self.weight}_{self.exp_name}_{timestamp}.csv")
-
-        # 如果文件不存在，就写表头
-        if self.is_main_process and not os.path.exists(self.loss_log_path):
-            with open(self.loss_log_path, "w", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    "global_step","epoch",
-                    "loss_teacher_ce"
-                ])'''
+        self.observation_token_acc = 0.
+        self.observation_token_acc_step = 0
 
     def _current_ce_emphasize_factor(self) -> float:
         """Linear warmup from 1.0 -> target over N steps or ratio of total steps.
@@ -491,21 +479,19 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         # Dynamic warmup factor passed to model.forward
         inputs['ce_emphasize_factor'] = self._current_ce_emphasize_factor()
         inputs['loss_type'] = ['ce']
+        inputs['compute_emphasize_acc'] = True
         '''(teacher_ce_loss, teacher_outputs) = super().compute_loss(
                 model, 
                 inputs,
                 return_outputs=True, num_items_in_batch=num_items_in_batch
             )'''
-        teacher_ce_loss = super().compute_loss(
+        teacher_ce_loss, teacher_output = super().compute_loss(
                 model, 
                 inputs,
-                return_outputs=False, num_items_in_batch=num_items_in_batch
+                return_outputs=True, num_items_in_batch=num_items_in_batch
             )
-        '''if self.is_main_process:
-            torch.cuda.synchronize()
-            time_2 = time()
-            print(f"ce forward time {time_2 - time_1}")'''
-        #outputs_teacher_loss = teacher_ce_loss.item()
+        self.observation_token_acc += teacher_output.mean_emphasize_acc
+        self.observation_token_acc_step += 1
 
         # Light-touch cleanup without forcing GPU sync every step
         #del teacher_outputs
@@ -518,22 +504,24 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
             except Exception:
                 pass
         
-        '''# --------  写本地文件  --------
-        if self.is_main_process:
-            with open(self.loss_log_path, "a", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    self.state.global_step,
-                    self.state.epoch,
-                    outputs_teacher_loss
-                ])
-        # --------------------------------------------'''
-
         return (teacher_ce_loss, None) if return_outputs else teacher_ce_loss
 
     def on_epoch_end(self):
         # 注意：HF Trainer 不会自动调用子类自定义的 on_epoch_end；实际汇总通过回调实现。
         return super().on_epoch_end()
+
+    def log(self, logs: dict, start_time: float | None = None):
+        # Merge our rolling averages into the standard logs once per logging call
+        merged = dict(logs)
+        if self.observation_token_acc_step > 0:
+            merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
+
+        # Reset accumulators after logging so the next window starts fresh
+        self.observation_token_acc = 0.
+        self.observation_token_acc_step = 0
+
+        # Call parent to keep default behavior (console/TB/W&B/etc.)
+        return super().log(merged, start_time)
 
 class CustomTrainerAVT_V2_Stage2(SFTTrainer):
     def __init__(self, *args, **kwargs): 
@@ -553,28 +541,13 @@ class CustomTrainerAVT_V2_Stage2(SFTTrainer):
             or torch.distributed.get_rank() == 0
         )
 
-        # 日志文件路径
-        '''log_dir = self.args.logging_dir or "./logs"
-        os.makedirs(log_dir, exist_ok=True)
-        timestamp = datetime.datetime.now().isoformat(timespec="seconds")
-        self.loss_log_path = os.path.join(log_dir, f"loss_history/loss_history_w{self.weight}_{self.exp_name}_{timestamp}.csv")
-
-        # 如果文件不存在，就写表头
-        if self.is_main_process and not os.path.exists(self.loss_log_path):
-            with open(self.loss_log_path, "w", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    "global_step","epoch",
-                    "loss_total",
-                    "loss_student_ce",
-                    "loss_align"
-                ])'''
-
         self._al_loss_cum = 0.0       # cumulative alignment loss since last log
         self._al_steps = 0            # number of micro-steps accumulated
         self._stu_ce_cum = 0.0        # cumulative student CE loss
         self._stu_ce_steps = 0
-                
+
+
+
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
         Compute training loss for AVT v2 stage2 with optional cached teacher latents.

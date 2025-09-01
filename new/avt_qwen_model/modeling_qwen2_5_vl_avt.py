@@ -1208,8 +1208,6 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
         teacher_hidden_states_for_alignment: Optional[Union[List[List[torch.Tensor]], torch.Tensor]] = None, # for the latent forward
         ce_patch_pos: Optional[List[List[int]]] = None, 
         ce_patch_vec: Optional[List[torch.Tensor]] = None,
-        stage: str = "",
-        enable_ce_checkpoint: bool = False,
         **kwargs: Unpack[TransformersKwargs],
     ) -> Union[tuple, Qwen2_5_VLModelOutputWithPast]:
         r"""
@@ -1485,7 +1483,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                         seg_att_m=pre_att_m,
                         past_kv=None,
                         need_hidden=False,
-                        no_grad_mode=True if stage == 'avt_v2_stage1' else False,  # no_grad_mode only for avt_v2_stage1
+                        no_grad_mode=False, #True if stage == 'avt_v2_stage1' else False,  # no_grad_mode only for avt_v2_stage1
                         **kwargs,
                     )
                     batch_last_hidden_state[b, :ans_start, :] = pre_out.last_hidden_state[0]
@@ -1568,7 +1566,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                                     align_losses_this_b.append(l_b)
 
                             batch_last_hidden_state[b, s:cut, :] = out.last_hidden_state[0]
-                            past_kv = detach_past_kv(out.past_key_values)
+                            past_kv = out.past_key_values #detach_past_kv(out.past_key_values)
 
                         # 3) image 尾段（no_grad，只产 KV；默认把 4D mask 关掉进一步省显存）
                         if cut < e:
@@ -1589,7 +1587,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                                 **kwargs,
                             )
                             batch_last_hidden_state[b, cut:e, :] = img_out.last_hidden_state[0]
-                            past_kv = detach_past_kv(img_out.past_key_values)
+                            past_kv = img_out.past_key_values #detach_past_kv(img_out.past_key_values)
 
                             # 跳过落在 image 尾段内的对齐点，但要推进指针，确保单调
                             while align_ptr < len(align_pos) and align_pos[align_ptr] < e:
@@ -1715,51 +1713,6 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                 cache_position=cache_position,
                 **kwargs,
             )
-        
-            '''else:  # latent_mode == False (CE forward)
-                # If we collected latent vectors, write them into inputs_embeds (your original code)
-                if ce_patch_pos is not None and ce_patch_vec is not None:
-                    for b in range(len(ce_patch_pos)):
-                        pos_list = ce_patch_pos[b]
-                        if not pos_list:
-                            continue
-                        vecs = ce_patch_vec[b].to(inputs_embeds.device, inputs_embeds.dtype)  # keep grad
-                        inputs_embeds[b, torch.tensor(pos_list, device=inputs_embeds.device, dtype=torch.long), :] = vecs
-
-                def _lm_call(inp_embeds, pos_ids, attn_m, pkv, use_cache_flag):
-                    # Wrap the original language_model call
-                    return self.language_model(
-                        input_ids=None,
-                        position_ids=pos_ids,
-                        attention_mask=attn_m,
-                        past_key_values=pkv,
-                        inputs_embeds=inp_embeds,
-                        use_cache=use_cache_flag,                  # will be False under checkpoint
-                        output_attentions=output_attentions,
-                        output_hidden_states=output_hidden_states,
-                        return_dict=True,
-                        cache_position=cache_position,
-                        **kwargs,
-                    )
-
-                # IMPORTANT:
-                # For checkpoint to work we must set use_cache=False to avoid stateful KV during recomputation.
-                if self.training and enable_ce_checkpoint:
-                    # Prepare minimal tensor-only args for checkpoint
-                    _inp = inputs_embeds
-                    _pos = position_ids
-                    _att = (attention_mask_4d if attention_mask_4d is not None else attention_mask)
-
-                    def _wrapped(inp, pos, att):
-                        return _lm_call(inp, pos, att, past_key_values, use_cache_flag=False)
-
-                    outputs = checkpoint(_wrapped, _inp, _pos, _att, use_reentrant=False)
-                else:
-                    outputs = _lm_call(
-                        inputs_embeds, position_ids,
-                        (attention_mask_4d if attention_mask_4d is not None else attention_mask),
-                        past_key_values, use_cache_flag=use_cache
-                    )'''
 
             hidden_states_to_return = []
             if output_hidden_states:
@@ -1816,6 +1769,7 @@ class Qwen2_5_VLCausalLMOutputWithPast(ModelOutput):
     ce_patch_pos: Optional[List[List[int]]] = None # AVT
     ce_patch_vec: Optional[List[torch.Tensor]] = None # AVT
     latent_embeds: Optional[List[torch.Tensor]] = None # AVT
+    mean_emphasize_acc: Optional[float] = None
 
 
 class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMixin):
@@ -1893,8 +1847,9 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         ce_emphasize_poss: Optional[List[List[int]]] = None,
         loss_type: Optional[List[str]] = [],
         output_latent_embeds: bool = False,
+        compute_emphasize_acc: bool = False,
         stage: str = "",
-        enable_ce_checkpoint: bool = False,
+        
         **kwargs: Unpack[TransformersKwargs],
     ) -> Union[tuple, Qwen2_5_VLCausalLMOutputWithPast]:
         r"""
@@ -1970,7 +1925,6 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
             ce_patch_pos=ce_patch_pos,
             ce_patch_vec=ce_patch_vec,
             stage=stage,
-            enable_ce_checkpoint=enable_ce_checkpoint,
             **kwargs,
         )
 
@@ -1978,7 +1932,7 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        
+        mean_emphasize_acc = None
         logits = None
         loss = 0
         if "ce" in loss_type:
@@ -2003,7 +1957,7 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                 weight = torch.ones_like(ce)
                 try:
                     for b, poss in enumerate(ce_emphasize_poss):
-                        if poss is None:
+                        if not poss:
                             continue
                         weight[b, torch.tensor(poss)-1] = float(ce_emphasize_factor)
                 except Exception:
@@ -2016,6 +1970,23 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
             else:
                 # Fallback to default loss function
                 loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size)
+
+            has_obs_cnt = 0
+            if compute_emphasize_acc:
+                # Compute emphasize accuracy
+                with torch.no_grad():
+                    mean_emphasize_acc = 0
+                    for b in range(labels.shape[0]):
+                        if not ce_emphasize_poss[b]:
+                            continue
+                        has_obs_cnt += 1
+                        preds = logits[b].argmax(dim=-1)[ce_emphasize_poss[b]][:-1]
+                        emphasize_labels = labels[b][ce_emphasize_poss[b]][1:]
+                        correct = (preds == emphasize_labels).float()
+                        emphasize_acc = correct.sum() / max(1, len(ce_emphasize_poss[b]))
+                        mean_emphasize_acc += emphasize_acc.item()
+                    mean_emphasize_acc /= has_obs_cnt
+
         if 'alignment' in loss_type:
             loss = outputs.alignment_loss
 
@@ -2036,7 +2007,8 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
             alignment_poss=alignment_poss,  # AVT
             ce_patch_pos=outputs.ce_patch_pos if hasattr(outputs, "ce_patch_pos") else None,
             ce_patch_vec=outputs.ce_patch_vec if hasattr(outputs, "ce_patch_vec") else None,
-            latent_embeds=latent_embeds
+            latent_embeds=latent_embeds,
+            mean_emphasize_acc=mean_emphasize_acc
         )
 
     def prepare_inputs_for_generation(
