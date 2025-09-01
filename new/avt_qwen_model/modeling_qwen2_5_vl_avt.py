@@ -1985,7 +1985,8 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                         correct = (preds == emphasize_labels).float()
                         emphasize_acc = correct.sum() / max(1, len(ce_emphasize_poss[b]))
                         mean_emphasize_acc += emphasize_acc.item()
-                    mean_emphasize_acc /= has_obs_cnt
+                    if mean_emphasize_acc>0:
+                        mean_emphasize_acc /= has_obs_cnt
 
         if 'alignment' in loss_type:
             loss = outputs.alignment_loss

@@ -490,8 +490,9 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
                 inputs,
                 return_outputs=True, num_items_in_batch=num_items_in_batch
             )
-        self.observation_token_acc += teacher_output.mean_emphasize_acc
-        self.observation_token_acc_step += 1
+        if teacher_output.mean_emphasize_acc is not None:
+            self.observation_token_acc += teacher_output.mean_emphasize_acc
+            self.observation_token_acc_step += 1
 
         # Light-touch cleanup without forcing GPU sync every step
         #del teacher_outputs
