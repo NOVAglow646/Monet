@@ -118,6 +118,8 @@ def avt_single_input_images_preprocess_function(sample, dataset_root=""):
         new_step = step.copy()
         if step["role"] == "system":
             new_step["content"][0]["text"] = "You are a helpful assistant."
+        # Track whether an assistant image has appeared before any observation text in this step
+        seen_assistant_image = False if step["role"] == "assistant" else None
         for j, content in enumerate(new_step["content"]):        
             if content["type"] == "image":
                 #if "image_file_name" not in content:
@@ -130,6 +132,13 @@ def avt_single_input_images_preprocess_function(sample, dataset_root=""):
                 if j>0 and new_step["content"][j-1]["type"] == "text" and step["role"] == "assistant":
                     if "<abs_vis_token></abs_vis_token>" not in new_step["content"][j-1]["text"]:
                         return None
+                # Mark that an assistant image has been seen in this step
+                if step["role"] == "assistant":
+                    seen_assistant_image = True
+            elif content["type"] == "text" and step["role"] == "assistant":
+                # Validate that any observation text must be preceded by an assistant image within the same step
+                if "<observation>" in content.get("text", "") and not seen_assistant_image:
+                    return None
             
             new_step["content"][j] = content
         conversations[i] = new_step
@@ -148,12 +157,18 @@ def avt_single_input_images_preprocess_function_question_only(sample, dataset_ro
         new_step = step.copy()
         #if step["role"] == "system":
         #    new_step["content"][0]["text"] += "Here is an example:\n\nWhat is the standing man wearing in this image? \nPut your final answer within \\boxed{}.\n\nI need to locate the standing man in the provided image and observe what he is wearing. To clearly identify what the man is wearing, I will generate a zoomed-in view of his face. \n<abs_vis_token></abs_vis_token> <observation>The zoomed-in image clearly shows the man is wearing a red hat and sunglasses.</observation> Based on the visual evidence, <observation>the man is wearing sunglasses.</observation>"
+        seen_assistant_image = False if step["role"] == "assistant" else None
         for j, content in enumerate(new_step["content"]):        
             if content["type"] == "image":
                 content["image"] = os.path.join(dataset_root,content.pop("image_file_name")) 
                 if j>0 and new_step["content"][j-1]["type"] == "text" and step["role"] == "assistant":
                     if "<abs_vis_token></abs_vis_token>" not in new_step["content"][j-1]["text"]:
                         return None, cur_max
+                if step["role"] == "assistant":
+                    seen_assistant_image = True
+            elif content["type"] == "text" and step["role"] == "assistant":
+                if "<observation>" in content.get("text", "") and not seen_assistant_image:
+                    return None, cur_max
             
             new_step["content"][j] = content
         conversations.append(new_step)

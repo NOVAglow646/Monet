@@ -44,6 +44,7 @@ def get_args():
     # ===== AVT v2 stage1 =====
     parser.add_argument("--latent_size", type=int, default=4)
     parser.add_argument("--ce_emphasize_factor", default=1.0, type=float)
+    parser.add_argument("--only_predict_obs", action='store_true', default=False)
 
     # ==== AVT v2 stage2 arguments =====
     parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in avt_stage1.")
@@ -70,17 +71,36 @@ def get_args():
     parser.add_argument("--eval_on_observation_tokens", action='store_true', default=False)
     
     # ==== Custom attention =====
+    parser.add_argument("--not_use_4d", action='store_true', default=False)
+    parser.add_argument("--not_mask_image", action='store_true', default=False)
     parser.add_argument("--mask_latent", action='store_true', default=False,
                         help="If set, make latent tokens (A_i) invisible to all subsequent tokens in build_additive_bias.")
     parser.add_argument("--observation_tokens_only_see_image_tokens", action='store_true', default=False)
     parser.add_argument("--observation_tokens_only_see_latent_tokens", action='store_true', default=False)
     parser.add_argument("--observation_tokens_cannot_see_question_image", action='store_true', default=False)
+    parser.add_argument("--latent_can_see_all_previous", action='store_true', default=False)
+    parser.add_argument("--observation_tokens_only_see_question_and_latent", action='store_true', default=False)
+    parser.add_argument("--mask_question_image", action='store_true', default=False)
     # ===== Precomputed teacher latent loading =====
     parser.add_argument("--teacher_latent_dir", type=str, default=None,
                         help="Directory that stores precomputed teacher latents (files named latent_{sample_id:08d}.pt). If not set, defaults to {save_model_path or ./checkpoints}/teacher_latents.")
+    parser.add_argument("--attn_analysis", action='store_true', default=False)
     # DeepSpeed config path (optional). If provided, Trainer will enable DeepSpeed with this config.
     # ===== PPL analysis =====
     parser.add_argument("--no_question_image", action='store_true', default=False)
+
+    # ===== Emphasize latent attention loss (AVT v2 stage1, CE pass) =====
+    parser.add_argument("--use_emphasize_latent_attn_loss", action='store_true', default=False,
+                        help="Enable auxiliary loss that encourages queries to attend more to latent tokens than non-latent tokens.")
+    parser.add_argument("--emphasize_latent_attn_coef", type=float, default=1.0,
+                        help="Scaling coefficient for emphasize_latent_attn loss when combined with CE.")
+    parser.add_argument("--emphasize_topk_layers", default=7, type=int)
+    parser.add_argument("--attn_loss_layers", nargs='+', default=[26,27], type=int)
+
+    # ===== Align vision embeddings and latents loss =====
+    parser.add_argument("--use_align_vision_latent_loss_projector", action='store_true', default=False)
+    parser.add_argument("--use_align_vision_latent_loss_pooling", action='store_true', default=False)
+    parser.add_argument("--align_vision_latent_loss_weight", type=float, default=1.0)
 
     return parser.parse_args()
 
@@ -484,6 +504,58 @@ def generate_labels_after_multi_token_start(
     return labels
 
 
+def generate_labels_after_multi_token_start_only_allow(
+    input_ids: torch.Tensor,
+    start_sequence: torch.Tensor,
+    allowed_poss: List[List[int]] = None
+) -> torch.Tensor:
+    """
+    For each row in `input_ids`, find the *first* occurrence of `start_sequence`
+    (a 1D tensor of multiple token IDs). Mask all tokens up to and including
+    that entire sub-sequence (set them to -100), and also mask any padding tokens
+    anywhere in the row. The remainder (tokens *after* the sub-sequence) are kept.
+
+    Args:
+      input_ids: 2D tensor [batch_size, seq_len].
+      start_sequence: 1D tensor of shape [k], the multi-token "start" pattern.
+      pad_token_id: which ID is used as padding (default=0).
+    
+    Returns:
+      labels: a new 2D tensor [batch_size, seq_len], where tokens before (and
+              including) the sub-sequence are -100, as well as any pad tokens,
+              and tokens after the sub-sequence are kept as in `input_ids`.
+    """
+    batch_size, seq_len = input_ids.shape
+    
+    # Clone so we can modify in-place
+    labels = input_ids.clone()
+    
+    for b in range(batch_size):
+        row = labels[b]
+        # Find first occurrence of the entire sub-sequence
+        start_idx = find_subsequence(row, start_sequence)
+        
+        if start_idx == -1:
+            # Sub-sequence not found -> mask everything
+            logging.warning(f"Couldn't find the <|im_start|>assistant, all labels are -100")
+            row[:] = -100
+        else:
+            # The sub-sequence length
+            sub_len = start_sequence.size(0)
+            end_of_subseq = start_idx + sub_len  # the position *after* the sub-sequence
+            
+            # Mask everything up to (and including) the sub-sequence
+            row[:end_of_subseq] = -100
+        
+        mask = torch.ones_like(row, dtype=torch.bool)
+        allowed_pos = allowed_poss[b]
+        mask[allowed_pos] = False
+        row[mask] = -100
+
+    return labels
+
+
+
 def generate_labels_after_latent_tokens(
     input_ids: torch.Tensor,
     start_sequence: torch.Tensor,
@@ -801,6 +873,7 @@ class SFTRepAnalyzer:
         torch.save({'subset_ids': self.subset_ids}, os.path.join(self.exp_save_folder, 'state.pt'))
 
 
+
 def find_segments_1d(ids, token_ids):
     """
     ids: 1D LongTensor, shape [L]
@@ -808,31 +881,35 @@ def find_segments_1d(ids, token_ids):
         'v_start', 'v_end', 'img_pad',
         'abs_start', 'abs_end', 'abs_pad',
         'obs_start', 'obs_end'
-    Returns: list of tuples for each S_i:
-        (I_idx: LongTensor, A_idx: LongTensor, O_idx: LongTensor)
-        O_idx may be empty if no <observation>...</observation> in T_i
+
+    Returns a list for each step S_i with:
+        (I_idx: LongTensor, A_idx: LongTensor, O_blocks: List[LongTensor])
+
+    Notes:
+    - We assume the first <|vision_start|>...</|vision_end|> pair is the question image
+      and is excluded from steps (i.e., only subsequent pairs are treated as I_i).
+    - O can appear multiple times inside a single T_i; DO NOT merge them.
+      O_blocks contains one LongTensor per <observation>...</observation> block.
+    - No cross-step O is expected; we only pair O blocks fully inside each T_i.
     """
+
     L = ids.numel()
-    I_segments, A_segments, O_segments = [], [], []
+    device = ids.device
 
     # Helper to collect indices between two tags (exclusive) that match 'wanted_id' (or all if None)
     def between(start_pos, end_pos, wanted_id=None):
         s = start_pos + 1
         e = end_pos
-        if s >= e: 
-            return torch.empty(0, dtype=torch.long, device=ids.device)
+        if s >= e:
+            return torch.empty(0, dtype=torch.long, device=device)
         if wanted_id is None:
-            idx = torch.arange(s, e, device=ids.device)
-        else:
-            mask = (ids[s:e] == wanted_id)
-            idx = torch.nonzero(mask, as_tuple=False).squeeze(-1) + s
-        return idx
+            return torch.arange(s, e, device=device, dtype=torch.long)
+        mask = (ids[s:e] == wanted_id)
+        return torch.nonzero(mask, as_tuple=False).squeeze(-1) + s
 
-    # 1) Parse all I_i by pairing <|vision_start|> ... <|vision_end|>
+    # 1) Pair all I_i by <|vision_start|> ... <|vision_end|>
     v_starts = torch.nonzero(ids == token_ids['v_start'], as_tuple=False).squeeze(-1)
     v_ends   = torch.nonzero(ids == token_ids['v_end'],   as_tuple=False).squeeze(-1)
-
-    # Greedy pairing in order
     v_ptr, e_ptr = 0, 0
     Vs, Ve = [], []
     while v_ptr < v_starts.numel() and e_ptr < v_ends.numel():
@@ -841,14 +918,17 @@ def find_segments_1d(ids, token_ids):
             v_ptr += 1; e_ptr += 1
         else:
             e_ptr += 1
-    Vs = Vs[1:] # Remove the question image
-    Ve = Ve[1:] # Remove the question image
+    # drop the question image (first vision pair)
+    Q_img_idx = between(Vs[0], Ve[0], wanted_id=token_ids['img_pad'])
+    if len(Vs) > 0 and len(Ve) > 0:
+        Vs = Vs[1:]
+        Ve = Ve[1:]
 
-    # 2) Parse all A_i by pairing <abs_vis_token> ... </abs_vis_token>
+    # 2) Pair all A_i by <abs_vis_token> ... </abs_vis_token>
     a_starts = torch.nonzero(ids == token_ids['abs_start'], as_tuple=False).squeeze(-1)
     a_ends   = torch.nonzero(ids == token_ids['abs_end'],   as_tuple=False).squeeze(-1)
-    As, Ae = [], []
     a_ptr, b_ptr = 0, 0
+    As, Ae = [], []
     while a_ptr < a_starts.numel() and b_ptr < a_ends.numel():
         if a_starts[a_ptr] < a_ends[b_ptr]:
             As.append(a_starts[a_ptr].item()); Ae.append(a_ends[b_ptr].item())
@@ -856,158 +936,259 @@ def find_segments_1d(ids, token_ids):
         else:
             b_ptr += 1
 
-    # 3) For each (I_i, A_i) in order, find O_i within T_i
+    # Precompute all observation tag positions to avoid repeated arange() inside loops
+    obs_starts_all = torch.nonzero(ids == token_ids['obs_start'], as_tuple=False).squeeze(-1)
+    obs_ends_all   = torch.nonzero(ids == token_ids['obs_end'],   as_tuple=False).squeeze(-1)
+
     S = []
-    for i in range(min(len(Vs), len(As))):
+    n_steps = min(len(Vs), len(As))
+    for i in range(n_steps):
         vs, ve = Vs[i], Ve[i]
         as_, ae = As[i], Ae[i]
 
+        # I_i and A_i indices (exclusive between their own tags)
         I_idx = between(vs, ve, wanted_id=token_ids['img_pad'])
         A_idx = between(as_, ae, wanted_id=token_ids['abs_pad'])
 
-        # T_i is from ae to next vision_start (or end of sequence)
-        t_end = Vs[i+1] if i + 1 < len(Vs) else L
-        # Find all <observation>...</observation> fully inside T_i
-        obs_starts = torch.nonzero((ids == token_ids['obs_start']) & (torch.arange(L, device=ids.device) >= ae) & (torch.arange(L, device=ids.device) < t_end), as_tuple=False).squeeze(-1)
-        obs_ends   = torch.nonzero((ids == token_ids['obs_end'])   & (torch.arange(L, device=ids.device) >  ae) & (torch.arange(L, device=ids.device) <= t_end), as_tuple=False).squeeze(-1)
+        # Text region T_i: from end of A_i to start of next vision, or to sequence end
+        t_end = Vs[i + 1] if (i + 1) < len(Vs) else L
 
-        # Pair obs tags in order
-        O_all = []
+        # Restrict observation tag candidates to the current T_i window
+        # Start tags: ae <= pos < t_end
+        # End tags:   ae <  pos <= t_end
+        # (Fully contained O will satisfy start < end and both within this window.)
+        in_start_win = (obs_starts_all >= ae) & (obs_starts_all < t_end)
+        in_end_win   = (obs_ends_all   >  ae) & (obs_ends_all   <= t_end)
+        o_starts = obs_starts_all[in_start_win]
+        o_ends   = obs_ends_all[in_end_win]
+
+        # Greedy 1-1 pairing within T_i
+        O_blocks = []
         p, q = 0, 0
-        while p < obs_starts.numel() and q < obs_ends.numel():
-            if obs_starts[p] < obs_ends[q]:
-                # tokens between the two tags (exclusive) belong to O_i
-                O_idx = between(obs_starts[p].item(), obs_ends[q].item(), wanted_id=None)
-                if O_idx.numel():
-                    O_all.append(O_idx)
-                p += 1; q += 1
+        while p < o_starts.numel() and q < o_ends.numel():
+            s_pos = o_starts[p].item()
+            e_pos = o_ends[q].item()
+            if s_pos < e_pos:
+                O_idx = between(s_pos, e_pos, wanted_id=None)
+                if O_idx.numel() > 0:
+                    O_blocks.append(O_idx)
+                p += 1
+                q += 1
             else:
                 q += 1
 
-        O_idx = torch.cat(O_all, dim=0) if len(O_all) else torch.empty(0, dtype=torch.long, device=ids.device)
-        S.append((I_idx, A_idx, O_idx))
+        S.append((I_idx, A_idx, O_blocks))
 
-    return S
+    return Q_img_idx, S
 
 
-def build_additive_bias(input_ids, pad_mask, token_ids, large_neg=-1e5, mask_latent: bool = False, observation_tokens_only_see_image_tokens: bool = False, observation_tokens_only_see_latent_tokens: bool = False, observation_tokens_cannot_see_question_image: bool = False):
+def build_4d_attn(
+    input_ids,
+    pad_mask,
+    token_ids,
+    large_neg: float = 1e-6,
+    not_mask_image: bool = False,
+    mask_latent: bool = False,
+    observation_tokens_only_see_image_tokens: bool = False,
+    observation_tokens_only_see_latent_tokens: bool = False,
+    observation_tokens_cannot_see_question_image: bool = False,
+    observation_tokens_only_see_question_and_latent: bool = False,
+    latent_can_see_all_previous: bool = False,
+    mask_question_image: bool = False,
+    return_type: str = 'bool'
+):
     """
     input_ids: LongTensor [B, L]
     pad_mask:  LongTensor/BoolTensor [B, L], 1/True for real tokens
-    token_ids: dict of special token ids (see above)
-    large_neg: float used as "negative infinity" added to logits
-
+    token_ids: dict of special token ids
+    large_neg: float used as "negative infinity" added to logits (not applied here)
     Returns:
-      attn_bias: FloatTensor [B, 1, L, L] with 0 for allowed and large_neg for blocked
-                 This bias ALREADY includes causal mask and padding mask.
+      allowed: BoolTensor [B, 1, L, L], True=allowed to attend, False=blocked
+      (Includes causal mask and padding mask already.)
+    Notes:
+      - This version expects find_segments_1d to return O_blocks: List[LongTensor] per step.
+      - We do NOT merge O blocks inside a T_i; each O block gets its own lower-tri self-visibility.
     """
+
+    # Keep on CPU as in the original version; model can cast later if needed.
     input_ids = input_ids.cpu()
     pad_mask = pad_mask.cpu()
-    
+
     B, L = input_ids.shape
     device = input_ids.device
-    dtype_bias = torch.float32  # keep in fp32 for numerical safety; model will cast internally
 
-    # Base: causal visibility (lower-triangular including diagonal)
+    # Base causal mask (lower triangular, including diagonal)
     causal = torch.tril(torch.ones((L, L), dtype=torch.bool, device=device))
 
-    # Start from causal AND valid tokens (both query & key must be valid)
+    # Valid tokens (both query and key must be valid)
     valid = pad_mask.bool()
-    allowed = causal.unsqueeze(0).clone()  # [1, L, L]
-    allowed = allowed.repeat(B, 1, 1)      # [B, L, L]
+    allowed = causal.unsqueeze(0).clone()   # [1, L, L]
+    allowed = allowed.repeat(B, 1, 1)       # [B, L, L]
     for b in range(B):
-        allowed[b] &= valid[b].unsqueeze(0)  # mask keys
-        allowed[b] &= valid[b].unsqueeze(1)  # mask queries
+        allowed[b] &= valid[b].unsqueeze(0)  # mask keys (columns)
+        allowed[b] &= valid[b].unsqueeze(1)  # mask queries (rows)
 
-    # Apply per-segment constraints
+    batch_segs=[]
     for b in range(B):
-        segs = find_segments_1d(input_ids[b], token_ids)
+        Q_img_idx, segs = find_segments_1d(input_ids[b], token_ids)
+        batch_segs.append(segs)
         if not segs:
             continue
 
         Lb = input_ids.shape[1]
-        all_idx = torch.arange(Lb, device=device)
+        ids = input_ids[b]
 
-        for (I_idx, A_idx, O_idx) in segs:
+        if mask_question_image:
+            allowed[b][:, Q_img_idx] = False  # no one can see question image tokens
+
+        for (I_idx, A_idx, O_blocks) in segs:
+            # --- Latent segment A_i rules ---
             if A_idx.numel():
-                allowed[b][A_idx, :] = False
+                # Clear all visibility for A_i queries first
+                if not latent_can_see_all_previous:
+                    allowed[b][A_idx, :] = False
+                else:
+                    if mask_question_image and Q_img_idx is not None and Q_img_idx.numel() > 0:
+                        allowed[b][A_idx.unsqueeze(1), Q_img_idx] = True
+                
 
-                # ① A 段能看见紧左侧的 I 段所有位置
+                # (1) A_i can see its left I_i (image pads inside this vision pair)
                 if I_idx.numel():
-                    # 形状广播: (|A|,1) × (|I|,) -> (|A|, |I|)
                     allowed[b][A_idx.unsqueeze(1), I_idx] = True
 
-                # ② A 段“前缀自可见”（当前位置及以前的全部 latent 位置，包括自己）
+                # (Optional) A_i prefix self-visibility (lower-tri within A_i)
                 n = A_idx.numel()
                 ar = torch.arange(n, device=A_idx.device)
-                # 下三角(含对角) : row i 看到 col j 当且仅当 j <= i
-                tri = ar.unsqueeze(1) >= ar.unsqueeze(0)          # (n, n) bool
-
-                # 将局部 (n×n) 三角可见图写回全局 [L×L]
-                rows = A_idx.unsqueeze(1).expand(n, n)            # (n, n)
-                cols = A_idx.unsqueeze(0).expand(n, n)            # (n, n)
+                tri = ar.unsqueeze(1) >= ar.unsqueeze(0)  # (n, n) bool
+                rows = A_idx.unsqueeze(1).expand(n, n)
+                cols = A_idx.unsqueeze(0).expand(n, n)
                 allowed[b][rows, cols] = tri
 
-                # 2) Only A_i can see I_i (mask I_i keys for all non-A queries)
-                if I_idx.numel():
-                    # Build row index set of "not in A_i"
+                # Ensure only A_i (and not others) can see I_i
+                if I_idx.numel() and not not_mask_image:
                     not_A = torch.ones(Lb, dtype=torch.bool, device=device)
                     not_A[A_idx] = False
-                    not_A_idx = torch.nonzero(not_A, as_tuple=False).squeeze(-1)  # [R]
+                    not_A_idx = torch.nonzero(not_A, as_tuple=False).squeeze(-1)
                     if not_A_idx.numel():
-                        # Block (rows in not_A_idx, cols in I_idx)
                         allowed[b][not_A_idx[:, None], I_idx] = False
 
-                # Optional: make A_i invisible to all subsequent tokens (as keys)
+                # Optionally hide A_i from all subsequent non-A queries as keys
                 if mask_latent:
-                    # rows r are considered "subsequent" if any a in A_idx satisfies a < r
                     r_idx = torch.arange(Lb, device=device)
-                    rows_to_block = (r_idx.unsqueeze(0) > A_idx.unsqueeze(1)).any(dim=0)  # [L]
+                    rows_to_block = (r_idx.unsqueeze(0) > A_idx.unsqueeze(1)).any(dim=0)  # rows after any A
                     if rows_to_block.any():
                         allowed[b][rows_to_block.nonzero(as_tuple=False).squeeze(-1)[:, None], A_idx] = False
 
-            if O_idx.numel() and A_idx.numel():
-                '''assert (observation_tokens_only_see_latent_tokens or observation_tokens_only_see_image_tokens) and not (observation_tokens_only_see_latent_tokens and observation_tokens_only_see_image_tokens), "At most one of observation_tokens_only_see_latent_tokens and observation_tokens_only_see_image_tokens can be True"'''
-                if observation_tokens_only_see_image_tokens:
-                    # 3) O_i only sees I_i
-                    allowed[b][O_idx, :] = False
-                    allowed[b][O_idx.unsqueeze(1), I_idx] = True
-                if observation_tokens_only_see_latent_tokens:
-                    # 3) O_i only sees A_i
-                    allowed[b][O_idx, :] = False
-                    # If mask_latent is enabled, O_i cannot see A_i either; otherwise allow.
-                    if not mask_latent:
-                        allowed[b][O_idx.unsqueeze(1), A_idx] = True
+
+
+            # --- Observation blocks: treat each O block independently ---
+            if O_blocks and A_idx.numel():
+                # Locate the question image range once if needed
                 if observation_tokens_cannot_see_question_image:
-                    ids = input_ids[b]
-                    question_img_start = torch.nonzero(ids == token_ids['v_start'], as_tuple=False).squeeze(-1)[0]
-                    question_imng_end   = torch.nonzero(ids == token_ids['v_end'],   as_tuple=False).squeeze(-1)[0]
-                    question_img_idx = torch.arange(question_img_start, question_imng_end + 1, device=device)
-                    allowed[b][O_idx.unsqueeze(1), question_img_idx] = False
-                    pass
-                
-                # ② O seg can see itself
-                n = O_idx.numel()
-                ar = torch.arange(n, device=O_idx.device)
-                # 下三角(含对角) : row i 看到 col j 当且仅当 j <= i
-                tri = ar.unsqueeze(1) >= ar.unsqueeze(0)          # (n, n) bool
+                    q_v_starts = torch.nonzero(ids == token_ids['v_start'], as_tuple=False).squeeze(-1)
+                    q_v_ends   = torch.nonzero(ids == token_ids['v_end'],   as_tuple=False).squeeze(-1)
+                    if q_v_starts.numel() > 0 and q_v_ends.numel() > 0:
+                        question_img_start = q_v_starts[0].item()
+                        question_img_end   = q_v_ends[0].item()
+                        question_img_idx = torch.arange(question_img_start, question_img_end + 1, device=device)
+                    else:
+                        question_img_idx = None
+                else:
+                    question_img_idx = None
 
-                # 将局部 (n×n) 三角可见图写回全局 [L×L]
-                rows = O_idx.unsqueeze(1).expand(n, n)            # (n, n)
-                cols = O_idx.unsqueeze(0).expand(n, n)            # (n, n)
-                allowed[b][rows, cols] = tri
+                # Precompute first answer start position for question segmentation (inline search)
+                if 'ans_start' in token_ids:
+                    pat = token_ids['ans_start']
+                    if isinstance(pat, torch.Tensor):
+                        k = int(pat.numel())
+                        ans_start_pos = -1
+                        if k == 1:
+                            eq = torch.nonzero(ids == pat.item(), as_tuple=False).squeeze(-1)
+                            ans_start_pos = int(eq[0].item()) if eq.numel() > 0 else -1
+                        else:
+                            Lb_local = int(ids.numel())
+                            ans_start_pos = -1
+                            for s in range(0, Lb_local - k + 1):
+                                if torch.equal(ids[s:s+k], pat):
+                                    ans_start_pos = s
+                                    break
+                    else:
+                        ans_start_pos = -1
+                else:
+                    ans_start_pos = -1
 
-            if I_idx.numel():
-                # Optional safety: restrict I_i queries to themselves only (identity)
+                for O_idx in O_blocks:
+                    if O_idx.numel() == 0:
+                        continue
+
+                    # Default: no extra rules for O beyond causal/padding and the I->only-A restriction
+                    if observation_tokens_only_see_question_and_latent:
+                        # O can ONLY see: (a) question tokens: positions < first ans_start that are NOT image tokens
+                        #                 (b) all latent pad tokens that appear BEFORE this O block
+                        allowed[b][O_idx, :] = False
+
+                        Lb_local = ids.size(0)
+                        ar = torch.arange(Lb_local, device=device)
+                        # Question tokens: before answer start and not image tokens
+                        if ans_start_pos != -1:
+                            before_ans = ar < ans_start_pos
+                        else:
+                            # No answer pattern found: treat as no question tokens
+                            before_ans = torch.zeros(Lb_local, dtype=torch.bool, device=device)
+                        non_image = (ids != token_ids['img_pad']) & (ids != token_ids['v_start']) & (ids != token_ids['v_end'])
+                        question_idx = torch.nonzero(before_ans & non_image, as_tuple=False).squeeze(-1)
+
+                        # Latent tokens prior to this observation block (all abs_pad positions with index < first O position)
+                        o_first = int(O_idx[0].item())
+                        latent_before_mask = (ids == token_ids['abs_pad']) & (ar < o_first)
+                        latent_before_idx = torch.nonzero(latent_before_mask, as_tuple=False).squeeze(-1)
+
+                        if question_idx.numel():
+                            allowed[b][O_idx.unsqueeze(1), question_idx] = True
+                        if latent_before_idx.numel():
+                            allowed[b][O_idx.unsqueeze(1), latent_before_idx] = True
+
+                        # Each O block has its own lower-tri self-visibility
+                        n_o = O_idx.numel()
+                        ar_o = torch.arange(n_o, device=O_idx.device)
+                        tri_o = ar_o.unsqueeze(1) >= ar_o.unsqueeze(0)
+                        rows_o = O_idx.unsqueeze(1).expand(n_o, n_o)
+                        cols_o = O_idx.unsqueeze(0).expand(n_o, n_o)
+                        allowed[b][rows_o, cols_o] = tri_o
+                        continue
+
+                    if observation_tokens_only_see_image_tokens:
+                        allowed[b][O_idx, :] = False
+                        if I_idx.numel():
+                            allowed[b][O_idx.unsqueeze(1), I_idx] = True
+
+                    if observation_tokens_only_see_latent_tokens:
+                        allowed[b][O_idx, :] = False
+                        if not mask_latent and A_idx.numel():
+                            allowed[b][O_idx.unsqueeze(1), A_idx] = True
+
+                    if question_img_idx is not None:
+                        allowed[b][O_idx.unsqueeze(1), question_img_idx] = False
+
+                    # Each O block has its own lower-tri self-visibility
+                    n_o = O_idx.numel()
+                    ar_o = torch.arange(n_o, device=O_idx.device)
+                    tri_o = ar_o.unsqueeze(1) >= ar_o.unsqueeze(0)
+                    rows_o = O_idx.unsqueeze(1).expand(n_o, n_o)
+                    cols_o = O_idx.unsqueeze(0).expand(n_o, n_o)
+                    allowed[b][rows_o, cols_o] = tri_o
+
+            # --- Vision tokens I_i as queries: restrict to identity (optional safety) ---
+            '''if I_idx.numel():
                 allowed[b][I_idx, :] = False
-                allowed[b][I_idx, I_idx] = True
+                allowed[b][I_idx, I_idx] = True'''
 
-    return allowed.unsqueeze(1)
-    # Convert to additive bias: 0 for allowed, large_neg for masked
-    #attn_bias = torch.zeros((B, 1, L, L), dtype=dtype_bias, device=device)
-    #mask_4d = (~allowed).unsqueeze(1)           # [B, 1, L, L]
-    #attn_bias = attn_bias.masked_fill(mask_4d, large_neg)
-    #return (attn_bias >= 0) #attn_bias
+    # Keep return type consistent with the previous implementation (bool mask).
+    # If you need an additive bias, convert with: bias = (~allowed).float() * large_neg.
+    if return_type == 'bool':
+        return allowed.unsqueeze(1), batch_segs  # [B, 1, L, L], bool
+    elif return_type == 'additive':
+        return (~allowed.unsqueeze(1)).float() * large_neg, batch_segs
 
 def find_segments_1d_wo_helper_images(ids, token_ids):
     """

@@ -25,7 +25,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Union, List
+from typing import Any, Callable, Optional, Union, List, Tuple, Dict
 from contextlib import nullcontext
 import torch
 import torch.nn as nn
@@ -47,9 +47,446 @@ from transformers.models.qwen2_5_vl.configuration_qwen2_5_vl import Qwen2_5_VLCo
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLPreTrainedModel
 import os
 from torch.utils.checkpoint import checkpoint
+from new.avt_qwen_model.loss_functions_utils import *
 os.environ["TRANSFORMERS_NO_AUTO_DOCSTRING"] = "1"
 
 logger = logging.get_logger(__name__)
+
+def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+    """
+    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
+    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+    """
+    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
+    if n_rep == 1:
+        return hidden_states
+    hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
+    return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
+
+def compute_affine_projectors(
+    inputs_embeds: torch.Tensor,
+    seg: List[List[Tuple]],
+    *,
+    stop_grad_img_subspace: bool = True,
+    solver: str = "svd",            # "svd" | "qr"
+    rank_eps: float = 50,
+) -> List[List[Dict[str, Any]]]:
+    """
+    Compute per-image affine subspace projectors in an implicit form (mu, U) so that
+    the projector P can be applied as P(x - mu) = U @ (U^T @ (x - mu)).
+    We return a nested list aligned as projectors[b][t_non_question] for each batch b.
+
+    Args:
+        inputs_embeds: Tensor [B, S, d], token embeddings after image features are scattered in.
+        seg: List[List[Tuple]], seg[b][s][0] gives the positions (list/tuple/tensor of ints) of image tokens at step s.
+        skip_question_image: If True, skip seg[b][0] as the question image.
+        stop_grad_img_subspace: If True, detach image statistics (mu, U) to avoid moving image space.
+        solver: "svd" (stable) or "qr" (faster) to get an orthonormal basis of span(X).
+        rank_eps: threshold (relative to top singular value) to drop tiny directions.
+
+    Returns:
+        projectors: List over batch; each element is a list over non-question images.
+            Each projector is a dict:
+              {
+                "mu": Tensor [d],                # affine center
+                "U":  Tensor [d, r],             # orthonormal basis columns (possibly r=0)
+                "idx": LongTensor [k],           # token positions used
+                "valid": bool                    # True if at least one token provided
+              }
+    """
+    assert inputs_embeds.dim() == 3, "inputs_embeds must be [B, S, d]"
+    B, S, d = inputs_embeds.shape
+    device, dtype = inputs_embeds.device, inputs_embeds.dtype
+
+    def _to_index_tensor(pos) -> torch.LongTensor:
+        if torch.is_tensor(pos):
+            return pos.to(device=device, dtype=torch.long)
+        elif isinstance(pos, (list, tuple)):
+            return torch.tensor(list(pos), device=device, dtype=torch.long)
+        else:
+            raise TypeError("Invalid seg position container; expect tensor/list/tuple of ints.")
+
+    projectors: List[List[Dict[str, Any]]] = []
+    for b in range(B):
+        seg_b = seg[b] if b < len(seg) else []
+        if len(seg_b) == 0:
+            projectors.append([])
+            continue
+        proj_b: List[Dict[str, Any]] = []
+
+        for s_idx in range(len(seg_b)):
+            pos_container = seg_b[s_idx][0]  # positions for this image-step
+            if pos_container is None:
+                proj_b.append({"mu": None, "U": None, "idx": None, "valid": False})
+                continue
+            idx = _to_index_tensor(pos_container)
+            if idx.numel() == 0:
+                proj_b.append({"mu": None, "U": None, "idx": idx, "valid": False})
+                continue
+
+            # Image token embeddings [k, d]
+            Z_img = inputs_embeds[b, idx, :]  # [k, d]
+
+            # Affine centering: mu and centered matrix X = Z_img - mu
+            if stop_grad_img_subspace:
+                mu = Z_img.detach().mean(dim=0)         # [d]
+                X = (Z_img.detach() - mu)               # [k, d]
+            else:
+                mu = Z_img.mean(dim=0)
+                X = Z_img - mu
+
+            # Handle degenerate case quickly
+            if X.numel() == 0 or torch.allclose(X, torch.zeros_like(X), atol=1e-12, rtol=0.0):
+                U = torch.empty(d, 0, device=device, dtype=dtype)
+                proj_b.append({"mu": mu, "U": U, "idx": idx, "valid": True})
+                continue
+
+            # Compute an orthonormal basis U for span(X) in R^d
+            if solver.lower() == "qr":
+                # QR on X^T: shapes are more favorable for tall matrices
+                Qt, Rt = torch.linalg.qr(X.transpose(0, 1).to(torch.float32), mode='reduced')  # Qt:[d, r], Rt:[r, k]
+                # Rank selection by diagonal magnitude
+                diag = torch.abs(torch.diagonal(Rt))
+                if diag.numel() > 0:
+                    thr = rank_eps * float(diag.max().item())
+                    r_eff = int((diag > thr).sum().item())
+                else:
+                    r_eff = 0
+                U = (Qt[:, :r_eff] if r_eff > 0 else Qt[:, :0]).to(dtype)  # [d, r_eff]
+            else:
+                # SVD on X: X = Ux * S * V^T; take right singular vectors (rows of V^T) -> columns V in R^d
+                Ux, Sx, Vh = torch.linalg.svd(X.to(torch.float32), full_matrices=False)  # Ux:[k,r], Sx:[r], Vh:[r,d]
+                if Sx.numel() > 0:
+                    thr = rank_eps * float(Sx.max().item())
+                    keep = (Sx > thr)
+                    if keep.any():
+                        V = Vh[keep, :].transpose(0, 1)  # [d, r_eff]
+                    else:
+                        V = Vh[:0, :].transpose(0, 1)    # [d, 0]
+                else:
+                    V = Vh.transpose(0, 1)               # [d, 0]
+                U = V.to(dtype)                           # [d, r_eff]
+
+            proj_b.append({"mu": mu, "U": U, "idx": idx, "valid": True})
+
+        projectors.append(proj_b)
+
+    return projectors
+
+def affine_subspace_alignment_loss(
+    projectors: List[List[Dict[str, Any]]],
+    ce_patch_vec: List[torch.Tensor],
+    *,
+    latent_size: int,
+    reduction: str = "mean",   # "mean" | "sum"
+) -> torch.Tensor:
+    """
+    Affine-subspace alignment loss for flattened latent tensors.
+
+    Args:
+        projectors: nested list as returned by `compute_affine_projectors`;
+            projectors[b] has length t_b (non-question images). Each item dict contains:
+              - "mu": Tensor [d]
+              - "U" : Tensor [d, r] (r can be 0)
+              - "valid": bool
+        ce_patch_vec: list over batch; each entry is a 2D tensor [latent_size * t, d]
+            containing all latents of this sample, step-wise concatenated.
+        latent_size: number of latent tokens per step (L).
+        reduction: how to reduce over batch/steps/latents; "mean" or "sum".
+
+    Returns:
+        Scalar tensor loss.
+    """
+    assert isinstance(projectors, list) and isinstance(ce_patch_vec, (list, tuple)), \
+        "projectors and ce_patch_vec must be lists over batch."
+    assert isinstance(latent_size, int) and latent_size > 0, "latent_size must be a positive int."
+
+    loss_terms: List[torch.Tensor] = []
+    device, dtype = None, None
+
+    for b, projs_b in enumerate(projectors):
+        if len(projs_b) == 0:
+            continue
+
+        Zflat = ce_patch_vec[b]
+        assert torch.is_tensor(Zflat) and Zflat.dim() == 2, \
+            f"ce_patch_vec[{b}] must be 2D [latent_size*t, d]; got shape {tuple(Zflat.shape)}"
+
+        if device is None:
+            device, dtype = Zflat.device, Zflat.dtype
+
+        N, d = Zflat.shape
+        assert N % latent_size == 0, \
+            f"First dim {N} is not divisible by latent_size {latent_size}."
+        t = N // latent_size
+        assert t == len(projs_b), \
+            f"Time steps mismatch for batch {b}: latents imply t={t}, but projectors has {len(projs_b)}."
+
+        # Reshape to [t, latent_size, d] so that step s occupies rows [s*latent_size : (s+1)*latent_size]
+        Zsteps = Zflat.reshape(t, latent_size, d)
+
+        for s in range(t):
+            proj = projs_b[s]
+            mu = proj.get("mu", None)
+            U  = proj.get("U", None)
+            valid = bool(proj.get("valid", False))
+
+            Z_lat = Zsteps[s]  # [latent_size, d]
+
+            if (not valid) or (mu is None) or (U is None):
+                # No image tokens available for this step: penalize the (uncentered) energy as a fallback.
+                res2 = (Z_lat * Z_lat).sum(dim=-1)  # [latent_size]
+                loss_terms.append(res2.mean())
+                continue
+
+            # Center latents by the image-step mean (affine subspace)
+            Zc = (Z_lat - mu)  # [latent_size, d]
+
+            # If rank is zero, residual is just the centered norm
+            if U.numel() == 0 or U.shape[1] == 0:
+                res2 = (Zc * Zc).sum(dim=-1)  # [latent_size]
+                loss_terms.append(res2.mean())
+                continue
+
+            # Project onto span(U): proj = (Zc @ U) @ U^T
+            U32  = U.to(torch.float32)          # [d, r]
+            Zc32 = Zc.to(torch.float32)         # [latent_size, d]
+            coeff = Zc32 @ U32                  # [latent_size, r]
+            proj  = coeff @ U32.transpose(0, 1) # [latent_size, d]
+            resid = Zc32 - proj                 # [latent_size, d]
+            res2  = (resid * resid).sum(dim=-1) # [latent_size]
+            loss_terms.append(res2.mean().to(Zc.dtype))
+
+    if len(loss_terms) == 0:
+        if device is None:
+            device, dtype = torch.device("cpu"), torch.float32
+        return torch.zeros((), device=device, dtype=dtype)
+
+    loss_stack = torch.stack(loss_terms)
+    if reduction == "sum":
+        return loss_stack.sum()
+    else:
+        return loss_stack.mean()
+
+@torch.no_grad()
+def _svd_select_U(
+    X: torch.Tensor,
+    r_max: int,
+    rank_eps: float,
+    energy_keep: Optional[float] = None,
+) -> torch.Tensor:
+    """
+    Select an orthonormal basis U (d x r) for span(X) using truncated SVD with rank/energy constraints.
+    X: [k, d] centered matrix (float32 recommended).
+    r_max: hard cap on subspace rank.
+    rank_eps: relative threshold to drop tiny singular values (relative to max).
+    energy_keep: if not None (e.g., 0.95), keep the smallest r so that sum(S[:r]^2)/sum(S^2) >= energy_keep.
+    Returns U: [d, r] (may be r=0).
+    """
+    # SVD on X: X = Ux * S * V^T. Right singular vectors (rows of V^T) span column-space in R^d.
+    Ux, S, Vh = torch.linalg.svd(X, full_matrices=False)  # Ux: [k, r], S: [r], Vh: [r, d]
+    if S.numel() == 0:
+        return Vh.transpose(0, 1)[:, :0]  # [d, 0]
+
+    # Threshold by magnitude
+    thr = float(S.max().item()) * rank_eps
+    keep_mag = (S > thr)
+
+    # Optional energy-based truncation
+    if energy_keep is not None and energy_keep > 0.0 and energy_keep <= 1.0:
+        s2 = S * S
+        cum = torch.cumsum(s2, dim=0)
+        total = s2.sum()
+        # minimal r s.t. cumulative energy ratio >= energy_keep
+        r_energy = int((cum / (total + 1e-12) >= energy_keep).nonzero(as_tuple=False)[0].item()) + 1
+    else:
+        r_energy = S.numel()
+
+    r_from_eps = int(keep_mag.sum().item())
+    r = min(r_from_eps, r_energy, int(r_max))
+    if r <= 0:
+        return Vh.transpose(0, 1)[:, :0]  # [d, 0]
+    # Take the top r right singular vectors
+    return Vh[:r, :].transpose(0, 1)  # [d, r]
+
+
+def compute_affine_projectors_rank_limited(
+    inputs_embeds: torch.Tensor,
+    seg: List[List[Tuple]],
+    *,
+    r_max: int = 32,
+    skip_question_image: bool = True,
+    stop_grad_img_subspace: bool = True,
+    solver: str = "svd",            # "svd" | "qr"
+    rank_eps: float = 1e-6,
+    energy_keep: Optional[float] = None,  # e.g., 0.95 to keep 95% energy; None to disable
+) -> List[List[Dict[str, Any]]]:
+    """
+    Compute per-image affine subspace projectors with rank limit. Each projector is represented by (mu, U),
+    where U has at most r_max columns.
+
+    Args:
+        inputs_embeds: [B, S, d] token embeddings after image features have been scattered.
+        seg: seg[b][s][0] gives positions (tensor/list/tuple of ints) of image tokens for step s.
+        r_max: hard cap on the subspace rank (columns of U).
+        skip_question_image: if True, skip seg[b][0] as the question image.
+        stop_grad_img_subspace: if True, detach image statistics so only latents are updated by this loss.
+        solver: "svd" (robust) or "qr" (faster). SVD supports energy_keep naturally.
+        rank_eps: relative singular-value threshold to prune tiny components.
+        energy_keep: optional energy ratio in (0,1]; keep minimal r achieving that cumulative energy.
+
+    Returns:
+        projectors[b][t] -> {"mu": Tensor[d], "U": Tensor[d, r], "idx": LongTensor[k], "valid": bool}
+    """
+    assert inputs_embeds.dim() == 3, "inputs_embeds must be [B, S, d]"
+    B, S, d = inputs_embeds.shape
+    device, dtype = inputs_embeds.device, inputs_embeds.dtype
+
+    def _to_index_tensor(pos) -> torch.LongTensor:
+        if torch.is_tensor(pos):
+            return pos.to(device=device, dtype=torch.long)
+        elif isinstance(pos, (list, tuple)):
+            return torch.tensor(list(pos), device=device, dtype=torch.long)
+        else:
+            raise TypeError("Invalid seg position container.")
+
+    projectors: List[List[Dict[str, Any]]] = []
+    for b in range(B):
+        seg_b = seg[b] if b < len(seg) else []
+        if len(seg_b) == 0:
+            projectors.append([])
+            continue
+        img_steps = seg_b
+
+        proj_b: List[Dict[str, Any]] = []
+        for s_idx in range(len(img_steps)):
+            pos_container = img_steps[s_idx][0]
+            if pos_container is None:
+                proj_b.append({"mu": None, "U": None, "idx": None, "valid": False})
+                continue
+            idx = _to_index_tensor(pos_container)
+            if idx.numel() == 0:
+                proj_b.append({"mu": None, "U": None, "idx": idx, "valid": False})
+                continue
+
+            Z_img = inputs_embeds[b, idx, :]  # [k, d]
+            if stop_grad_img_subspace:
+                mu = Z_img.detach().mean(dim=0)  # [d]
+                Xc = (Z_img.detach() - mu).to(torch.float32)  # [k, d] in fp32 for stability
+            else:
+                mu = Z_img.mean(dim=0)
+                Xc = (Z_img - mu).to(torch.float32)
+
+            # Degenerate or nearly-zero case
+            if Xc.numel() == 0 or torch.allclose(Xc, torch.zeros_like(Xc), atol=1e-12, rtol=0.0):
+                U = torch.empty(d, 0, device=device, dtype=dtype)
+                proj_b.append({"mu": mu, "U": U, "idx": idx, "valid": True})
+                continue
+
+            if solver.lower() == "qr":
+                # QR on Xc^T -> take first r columns, then cap by r_max and rank_eps.
+                Qt, Rt = torch.linalg.qr(Xc.transpose(0, 1), mode='reduced')  # Qt: [d, r], Rt: [r, k]
+                diag = torch.abs(torch.diagonal(Rt))
+                if diag.numel() > 0:
+                    thr = rank_eps * float(diag.max().item())
+                    r_eff = int((diag > thr).sum().item())
+                else:
+                    r_eff = 0
+                r = min(r_eff, int(r_max))
+                U = (Qt[:, :r] if r > 0 else Qt[:, :0]).to(dtype)  # [d, r]
+            else:
+                # SVD with energy-based truncation support
+                U = _svd_select_U(Xc, r_max=int(r_max), rank_eps=rank_eps, energy_keep=energy_keep).to(dtype)
+
+            proj_b.append({"mu": mu, "U": U, "idx": idx, "valid": True})
+
+        projectors.append(proj_b)
+
+    return projectors
+
+
+def affine_subspace_alignment_loss_fastU_rank(
+    projectors: List[List[Dict[str, Any]]],
+    ce_patch_vec: List[torch.Tensor],
+    *,
+    latent_size: int,
+    reduction: str = "mean",   # "mean" | "sum"
+) -> torch.Tensor:
+    """
+    Rank-limited affine-subspace alignment loss using the fast U-trick:
+      ||(I - U U^T)(z - mu)||^2 = ||z - mu||^2 - ||(z - mu) U||^2
+
+    Args:
+        projectors: nested list from compute_affine_projectors_rank_limited (mu, U with r <= r_max).
+        ce_patch_vec: list over batch; entry b is 2D tensor [latent_size * t, d].
+        latent_size: number of latent tokens per step (L).
+        reduction: "mean" or "sum" over all steps and latents.
+
+    Returns:
+        Scalar tensor loss.
+    """
+    assert isinstance(projectors, list) and isinstance(ce_patch_vec, (list, tuple))
+    assert isinstance(latent_size, int) and latent_size > 0
+
+    loss_terms: List[torch.Tensor] = []
+    device, dtype = None, None
+
+    for b, projs_b in enumerate(projectors):
+        if len(projs_b) == 0:
+            continue
+
+        Zflat = ce_patch_vec[b]
+        assert torch.is_tensor(Zflat) and Zflat.dim() == 2, \
+            f"ce_patch_vec[{b}] must be [latent_size*t, d]"
+        if device is None:
+            device, dtype = Zflat.device, Zflat.dtype
+
+        N, d = Zflat.shape
+        assert N % latent_size == 0, \
+            f"N={N} is not divisible by latent_size={latent_size}"
+        t = N // latent_size
+        assert t == len(projs_b), \
+            f"time steps mismatch: t={t} vs projectors={len(projs_b)}"
+
+        Zsteps = Zflat.view(t, latent_size, d)  # [t, L, d]
+
+        for s in range(t):
+            proj = projs_b[s]
+            mu = proj.get("mu", None)
+            U  = proj.get("U", None)
+            valid = bool(proj.get("valid", False))
+
+            Z_lat = Zsteps[s]  # [L, d]
+
+            if (not valid) or (mu is None) or (U is None):
+                # Fallback: penalize the raw energy (uncentered) if projector is invalid.
+                res2 = (Z_lat * Z_lat).sum(dim=-1)         # [L]
+                loss_terms.append(res2.mean())
+                continue
+
+            Zc = (Z_lat - mu)                              # [L, d]
+            if U.numel() == 0 or U.shape[1] == 0:
+                res2 = (Zc * Zc).sum(dim=-1)               # [L]
+                loss_terms.append(res2.mean())
+                continue
+
+            # Fast residual energy via norm difference
+            U32  = U.to(torch.float32)                     # [d, r]
+            Zc32 = Zc.to(torch.float32)                    # [L, d]
+            z_norm2 = (Zc32 * Zc32).sum(dim=-1)            # [L]
+            coeff   = Zc32 @ U32                            # [L, r]
+            proj_energy = (coeff * coeff).sum(dim=-1)      # [L]
+            res2 = (z_norm2 - proj_energy).to(Zc.dtype)    # [L]
+            loss_terms.append(res2.mean())
+
+    if not loss_terms:
+        if device is None:
+            device, dtype = torch.device("cpu"), torch.float32
+        return torch.zeros((), device=device, dtype=dtype)
+
+    loss_stack = torch.stack(loss_terms)
+    return loss_stack.sum() if reduction == "sum" else loss_stack.mean()
+
 
 
 class Qwen2_5_VLMLP(nn.Module):
@@ -508,6 +945,7 @@ class Qwen2_5_VLModelOutputWithPast(ModelOutput):
     ce_patch_pos: Optional[List[List[int]]] = None
     ce_patch_vec: Optional[List[torch.Tensor]] = None
     alignment_loss: Optional[torch.FloatTensor] = None
+    align_vision_latent_pre_result: List[List[Dict[str, Any]]] = None
 
 class Qwen2_5_VLRotaryEmbedding(nn.Module):
     def __init__(self, config: Qwen2_5_VLTextConfig, device=None):
@@ -646,6 +1084,8 @@ class Qwen2_5_VLAttention(nn.Module):
 
         self.rotary_emb = Qwen2_5_VLRotaryEmbedding(config=config)
 
+        self.attn_loss = None
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -658,6 +1098,8 @@ class Qwen2_5_VLAttention(nn.Module):
         position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
+        self.attn_loss = None
+        
         bsz, q_len, _ = hidden_states.size()
 
         query_states = self.q_proj(hidden_states)
@@ -680,7 +1122,8 @@ class Qwen2_5_VLAttention(nn.Module):
         attention_interface: Callable = eager_attention_forward
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-
+        else:
+            pass
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -696,6 +1139,125 @@ class Qwen2_5_VLAttention(nn.Module):
 
         attn_output = attn_output.reshape(bsz, q_len, -1).contiguous()
         attn_output = self.o_proj(attn_output)
+        # Optionally cache attn weights (last layer collection) for auxiliary losses
+        
+        if kwargs.get('collect_emphasize_attn', False):
+            # Expect kwargs keys:
+            #   key_mask: BoolTensor [B, S]  (True where token is latent)
+            #   query_poss : List[List[int]]    (per-batch query indices, e.g., O positions)
+            #   compute_attn_loss: bool
+            key_mask = kwargs.get('key_mask', None)
+            query_poss = kwargs.get('query_poss', None)
+            compute_attn_loss = bool(kwargs.get('compute_attn_loss', False))
+
+            if (key_mask is not None) and (query_poss is not None) and compute_attn_loss:
+                with torch.autocast(device_type=str(hidden_states.device.type), enabled=True):
+                    # Repeat K to match number of heads
+                    k_rep = repeat_kv(key_states, self.num_key_value_groups)  # [B,H,S,D]
+                    B, H, S, D = k_rep.shape
+                    scale = self.scaling
+
+                    # Helper to extract additive mask rows for selected queries
+                    # Returns a float tensor of shape [Q, S] to be *added* to logits
+                    def _extract_mask_rows(attn_mask_b, poss_b):
+                        """
+                        attn_mask_b: could be [1,S,S], [S,S], or None
+                        returns: float [Q,S] additive bias (0 for allowed, -inf/large_neg for blocked)
+                        """
+                        if attn_mask_b is None or len(poss_b) == 0:
+                            return None
+                        if attn_mask_b.dim() == 3:   # [1,S,S] or [H,S,S] (we assume first dim ==1 for standard HF)
+                            if attn_mask_b.size(0) == 1:
+                                rows = attn_mask_b[0, poss_b, :]  # [Q,S]
+                            else:
+                                # If somehow per-head mask exists, average (rare). Better would be select a single head.
+                                rows = attn_mask_b.mean(dim=0)[poss_b, :]  # [Q,S]
+                        elif attn_mask_b.dim() == 2: # [S,S]
+                            rows = attn_mask_b[poss_b, :]                 # [Q,S]
+                        else:
+                            return None
+                        # Convert bool mask to additive if needed: True=allowed -> 0, False=blocked -> -inf
+                        if rows.dtype == torch.bool:
+                            rows = torch.where(rows, torch.zeros((), device=rows.device, dtype=torch.float32),
+                                               torch.full((), float('-inf'), device=rows.device, dtype=torch.float32))
+                        return rows.to(dtype=torch.float32)
+
+                    # Normalize attention_mask to per-batch 2/3D for extraction
+                    # attention_mask can be [B,1,S,S] or [B,S,S] (additive), rarely bool.
+                    am = attention_mask
+                    stats = []
+                    for b in range(B):
+                        poss_b = query_poss[b] if b < len(query_poss) else []
+                        if not poss_b:
+                            continue
+
+                        # Build per-batch mask view
+                        mask_b = None
+                        if am is not None:
+                            if am.dim() == 4:        # [B,1,S,S]
+                                mask_b = am[b]       # [1,S,S]
+                            elif am.dim() == 3:      # [B,S,S]
+                                mask_b = am[b]       # [S,S]
+                            else:
+                                mask_b = None
+
+                        q_b = query_states[b, :, poss_b, :]            # [H,Q,D]
+                        k_b = k_rep[b]                                 # [H,S,D]
+                        logits = torch.einsum('hqd,hsd->hqs', q_b, k_b) * scale  # [H,Q,S]
+
+                        # Apply additive attention mask rows if available; otherwise enforce causal fallback
+                        mask_rows = _extract_mask_rows(mask_b, poss_b)  # [Q,S] or None
+                        if mask_rows is not None:
+                            logits = logits + mask_rows[None, :, :]     # broadcast over H
+                        else:
+                            # Fallback causal (when no attention_mask provided)
+                            ar = torch.arange(S, device=logits.device)[None, None, :]
+                            q_idx = torch.tensor(poss_b, device=logits.device)[None, :, None]
+                            causal = (ar <= q_idx)
+                            logits = logits.masked_fill(~causal, float('-inf'))
+
+                        # Softmax over keys AFTER applying the mask
+                        probs = torch.softmax(logits, dim=-1)          # [H,Q,S]
+
+                        # Build allowed-key boolean for counting means (row-wise)
+                        if mask_rows is not None:
+                            # For additive masks: allowed if mask value is not "very negative"
+                            if mask_rows.dtype == torch.float32 or mask_rows.dtype == torch.float16 or mask_rows.dtype == torch.bfloat16:
+                                # Threshold for "blocked": accommodate -1e4 or -inf
+                                allowed_bool = mask_rows > -1e8         # [Q,S] bool
+                            else:
+                                allowed_bool = mask_rows.to(torch.bool) # [Q,S]
+                        else:
+                            # Causal fallback: allowed if col <= row index
+                            ar = torch.arange(S, device=logits.device)[None, :]
+                            q_idx = torch.tensor(poss_b, device=logits.device)[:, None]
+                            allowed_bool = (ar <= q_idx)                # [Q,S] bool
+
+                        # Count latent / non-latent allowed keys per row
+                        lat_mask_row = key_mask[b].to(allowed_bool.device)  # [S] bool
+                        cnt_lat = (allowed_bool & lat_mask_row[None, :]).sum(dim=-1)      # [Q]
+                        cnt_all = allowed_bool.sum(dim=-1)                                # [Q]
+                        cnt_nonlat = (cnt_all - cnt_lat).clamp_min(1)
+
+                        # Compute masses
+                        lat_mask_float = lat_mask_row.to(probs.dtype)[None, None, :]      # [1,1,S]
+                        lat_mass = (probs * lat_mask_float).sum(dim=-1)                   # [H,Q]
+
+                        # Convert counts to same dtype/shape for broadcasting
+                        cnt_lat = cnt_lat.to(probs.dtype)[None, :]                        # [1,Q]
+                        cnt_nonlat = cnt_nonlat.to(probs.dtype)[None, :]                  # [1,Q]
+
+                        # Avoid rows with zero latent keys allowed
+                        valid_rows = (cnt_lat > 0).squeeze(0)                             # [Q] bool
+                        if valid_rows.any():
+                            lat_mean = (lat_mass[:, valid_rows] / cnt_lat[:, valid_rows])             # [H,Qv]
+                            nlat_mean = ((1.0 - lat_mass[:, valid_rows]) / cnt_nonlat[:, valid_rows]) # [H,Qv]
+                            diff = torch.relu(nlat_mean.detach() - lat_mean).mean()       # scalar
+                            stats.append(diff)
+
+                    if stats:
+                        self.attn_loss = torch.stack(stats).mean()
+
         return attn_output, attn_weights
 
 
@@ -900,10 +1462,13 @@ class Qwen2_5_VLTextModel(Qwen2_5_VLPreTrainedModel):
         batch_last_hidden_state_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
 
-        for decoder_layer in self.layers:
+        for l, decoder_layer in enumerate(self.layers):
             if output_hidden_states:
                 batch_last_hidden_state_states += (hidden_states,)
-
+            if 'attn_loss_layers' in kwargs and l in kwargs['attn_loss_layers']:
+                kwargs['compute_attn_loss'] = True
+            else:
+                kwargs['compute_attn_loss'] = False
             layer_outputs = decoder_layer(
                 hidden_states,
                 attention_mask=causal_mask_mapping[decoder_layer.attention_type],
@@ -1208,6 +1773,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
         teacher_hidden_states_for_alignment: Optional[Union[List[List[torch.Tensor]], torch.Tensor]] = None, # for the latent forward
         ce_patch_pos: Optional[List[List[int]]] = None, 
         ce_patch_vec: Optional[List[torch.Tensor]] = None,
+        segs: Optional[List[List[tuple]]] = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> Union[tuple, Qwen2_5_VLModelOutputWithPast]:
         r"""
@@ -1309,6 +1875,33 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                 # Avoid in-place modification on an expanded view to prevent autograd versioning issues
                 position_ids = position_ids + delta.to(position_ids.device)
 
+        if segs is not None:
+            if 'align_vision_latent_projector' in kwargs['loss_type']:
+                '''projectors = compute_affine_projectors(
+                    inputs_embeds=inputs_embeds,  # [B, S, d]
+                    seg=segs,
+                    stop_grad_img_subspace=True,
+                    solver="svd",
+                    rank_eps=1e-6,
+                )'''
+                align_vision_latent_pre_result = compute_affine_projectors_rank_limited(
+                    inputs_embeds=inputs_embeds,  # [B, S, d]
+                    seg=segs,
+                    stop_grad_img_subspace=True,
+                    solver="svd",
+                    rank_eps=1e-6,
+                    r_max=32
+                )
+            elif 'align_vision_latent_pooling' in kwargs['loss_type']:
+                align_vision_latent_pre_result = collect_pooled_image_embeddings(
+                    inputs_embeds=inputs_embeds,   # [B, S, d]
+                    seg=segs,                       # list[list[tuple]], seg[b][s][0] are positions; do NOT drop first
+                    latent_size=kwargs['latent_size'],
+                    method="gaussian",             # or "chunk"
+                    sigma_scale=0.5,
+                )
+        else:
+            align_vision_latent_pre_result = None
 
         # ------------------------------------------------------------------
         # 0.  Basic shapes & containers
@@ -1583,7 +2176,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                                 seg_att_m=img_att_m,
                                 past_kv=past_kv,
                                 need_hidden=False,
-                                no_grad_mode=True,
+                                no_grad_mode=False,
                                 **kwargs,
                             )
                             batch_last_hidden_state[b, cut:e, :] = img_out.last_hidden_state[0]
@@ -1609,8 +2202,6 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                     else:
                         prev_hidden = batch_last_hidden_state[b, pos - 1, :].unsqueeze(0).unsqueeze(0).contiguous()
                         latent_embed = prev_hidden.clone() if self.training else prev_hidden.detach()   
-                        #latent_embed = prev_hidden.detach() # grad norm not exploding
-                        #latent_embed = prev_hidden.detach() + (prev_hidden - prev_hidden.detach()) # STE
                         ce_patch_pos[b].append(pos)
                         ce_patch_vec[b].append(latent_embed[0, 0])
 
@@ -1630,6 +2221,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                         cache_position=torch.tensor([pos], device=device),
                         use_cache=True,
                         output_hidden_states=True,
+                        output_attentions=output_attentions,
                         return_dict=True,
                         **kwargs,
                     )
@@ -1699,7 +2291,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                     vecs = ce_patch_vec[b].to(inputs_embeds.device, inputs_embeds.dtype)
                     # 写入到对应位置
                     inputs_embeds[b, torch.tensor(pos_list, device=inputs_embeds.device, dtype=torch.long), :] = vecs
-            
+
             outputs = self.language_model(
                 input_ids=None,
                 position_ids=position_ids,
@@ -1732,6 +2324,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                 hidden_states=hidden_states_to_return,
                 attentions=outputs.attentions,
                 rope_deltas=self.rope_deltas,
+                align_vision_latent_pre_result=align_vision_latent_pre_result
             )
             return output if return_dict else output.to_tuple()
 
@@ -1770,6 +2363,8 @@ class Qwen2_5_VLCausalLMOutputWithPast(ModelOutput):
     ce_patch_vec: Optional[List[torch.Tensor]] = None # AVT
     latent_embeds: Optional[List[torch.Tensor]] = None # AVT
     mean_emphasize_acc: Optional[float] = None
+    # Optional dictionary of losses when multiple objectives are computed in a single forward
+    loss_dict: Optional[dict] = None
 
 
 class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMixin):
@@ -1845,11 +2440,17 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         ce_patch_vec: Optional[List[torch.Tensor]] = None,
         ce_emphasize_factor: Optional[float] = 1.0,
         ce_emphasize_poss: Optional[List[List[int]]] = None,
+        # Auxiliary attention-emphasis loss controls
+        collect_emphasize_attn: Optional[bool] = False,
+        emphasize_query_poss: Optional[List[List[int]]] = None,
+        emphasize_topk_layers: Optional[int] = None,
+        attn_loss_layers: Optional[List[int]] = None,
         loss_type: Optional[List[str]] = [],
         output_latent_embeds: bool = False,
         compute_emphasize_acc: bool = False,
+        segs: Optional[List[List[tuple]]] = None,
+        latent_size: Optional[int] = 16,
         stage: str = "",
-        
         **kwargs: Unpack[TransformersKwargs],
     ) -> Union[tuple, Qwen2_5_VLCausalLMOutputWithPast]:
         r"""
@@ -1901,7 +2502,17 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-    
+        
+        # Whether we plan to compute emphasize_latent_attn in this forward
+        _need_emph = (not latent_mode) and (isinstance(loss_type, (list, tuple)) and ('emphasize_latent_attn' in loss_type))
+        if _need_emph:
+            kwargs['attn_loss_layers'] = attn_loss_layers
+            kwargs['key_mask'] = input_ids == self.config.latent_token_id
+            kwargs['query_poss'] = emphasize_query_poss
+        if 'align_vision_latent_projector' in loss_type or 'align_vision_latent_pooling' in loss_type:
+            kwargs['latent_size'] = latent_size
+            kwargs['loss_type'] = loss_type
+
         outputs = self.model(
             input_ids=input_ids,
             pixel_values=pixel_values,
@@ -1925,8 +2536,11 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
             ce_patch_pos=ce_patch_pos,
             ce_patch_vec=ce_patch_vec,
             stage=stage,
+            # Thread flag down so the last decoder layer can cache attentions
+            collect_emphasize_attn=(collect_emphasize_attn or _need_emph),
+            segs=segs if 'align_vision_latent_projector' in loss_type or 'align_vision_latent_pooling' in loss_type else None,
             **kwargs,
-        )
+    )
 
         hidden_states = outputs[0]
 
@@ -1935,6 +2549,7 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         mean_emphasize_acc = None
         logits = None
         loss = 0
+        loss_dict = {}
         if "ce" in loss_type:
             # Optional: apply per-token weighting on ce_emphasize_poss
             logits = self.lm_head(hidden_states[:, slice_indices, :])
@@ -1967,9 +2582,11 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                 valid = (shift_labels != -100).float()
                 num_valid = (weight * valid).sum().clamp_min(1.0)
                 loss = (ce * weight * valid).sum() / num_valid
+                loss_dict['ce'] = loss
             else:
                 # Fallback to default loss function
                 loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size)
+                loss_dict['ce'] = loss
 
             has_obs_cnt = 0
             if compute_emphasize_acc:
@@ -1989,28 +2606,71 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                         mean_emphasize_acc /= has_obs_cnt
 
         if 'alignment' in loss_type:
-            loss = outputs.alignment_loss
+                loss = outputs.alignment_loss
+                loss_dict['alignment'] = loss
+
+            # Compute auxiliary emphasize_latent_attn loss using cached attention if requested
+        if _need_emph:
+            ids = input_ids if input_ids is not None else None
+            total_emph = torch.tensor(0.)
+            if ids is not None:
+                for layer in self.language_model.layers:
+                    if layer.self_attn.attn_loss is not None:
+                        if total_emph.device != layer.self_attn.attn_loss.device:
+                            total_emph = total_emph.to(layer.self_attn.attn_loss.device)
+                        total_emph += layer.self_attn.attn_loss
+                        setattr(layer.self_attn, 'attn_loss', None)
+                if total_emph.sum()==0:
+                    pass
+                loss_dict['emphasize_latent_attn'] = total_emph/len(attn_loss_layers)
+
+        if 'align_vision_latent_projector' in loss_type:
+            '''aff_sub_loss = affine_subspace_alignment_loss(
+                projectors=outputs.projectors,
+                ce_patch_vec=ce_patch_vec,    # list length B, each [L,T,d] or [T,L,d]
+                latent_size=latent_size,
+                reduction="mean",
+            )'''
+            aff_sub_loss = affine_subspace_alignment_loss_fastU_rank(
+                projectors=outputs.align_vision_latent_pre_result,
+                ce_patch_vec=ce_patch_vec,    # list length B, each [L,T,d] or [T,L,d]
+                latent_size=latent_size,
+                reduction="mean",
+            )
+            loss_dict['align_vision_latent_projector'] = aff_sub_loss
+        elif 'align_vision_latent_pooling' in loss_type:
+            align_vision_latent_loss = pooled_alignment_loss(
+                pooled_images=outputs.align_vision_latent_pre_result,         # list of [latent_size*t, d]
+                ce_patch_vec=ce_patch_vec,           # list of [latent_size*t, d]
+                latent_size=latent_size,
+                loss_type="cosine",                     # or "cosine" / "smoothl1"
+                normalize=False,                     # set True if you prefer angular alignment with MSE
+                stop_grad_image=True,                # only update latent side
+                reduction="mean",
+            )
+            loss_dict['align_vision_latent_pooling'] = align_vision_latent_loss
 
         latent_embeds = None
         if output_latent_embeds:
-            assert latent_mode, "output_latent_embeds requires latent_mode"
-            latent_embeds = []
-            for b, alignment_poss_b in enumerate(alignment_poss):
-                latent_embeds.append(outputs.last_hidden_state[b][alignment_poss_b, :].detach())
+                assert latent_mode, "output_latent_embeds requires latent_mode"
+                latent_embeds = []
+                for b, alignment_poss_b in enumerate(alignment_poss):
+                    latent_embeds.append(outputs.last_hidden_state[b][alignment_poss_b, :].detach())
 
         return Qwen2_5_VLCausalLMOutputWithPast(
-            loss=loss,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-            rope_deltas=outputs.rope_deltas,
-            alignment_poss=alignment_poss,  # AVT
-            ce_patch_pos=outputs.ce_patch_pos if hasattr(outputs, "ce_patch_pos") else None,
-            ce_patch_vec=outputs.ce_patch_vec if hasattr(outputs, "ce_patch_vec") else None,
-            latent_embeds=latent_embeds,
-            mean_emphasize_acc=mean_emphasize_acc
-        )
+                loss=loss,
+                logits=logits,
+                past_key_values=outputs.past_key_values,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+                rope_deltas=outputs.rope_deltas,
+                alignment_poss=alignment_poss,  # AVT
+                ce_patch_pos=outputs.ce_patch_pos if hasattr(outputs, "ce_patch_pos") else None,
+                ce_patch_vec=outputs.ce_patch_vec if hasattr(outputs, "ce_patch_vec") else None,
+                latent_embeds=latent_embeds,
+                mean_emphasize_acc=mean_emphasize_acc,
+                loss_dict=loss_dict if len(loss_dict)>0 else None
+            )
 
     def prepare_inputs_for_generation(
         self,

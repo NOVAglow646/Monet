@@ -1,4 +1,5 @@
 from trl import SFTTrainer, SFTConfig
+from typing import Optional
 from transformers import TrainerCallback
 import logging
 import torch
@@ -56,7 +57,7 @@ class CustomTrainerAVTStage1(SFTTrainer):
             not torch.distributed.is_initialized()
             or torch.distributed.get_rank() == 0
         )
-
+    # Gradient checkpointing is controlled per-forward in compute_loss
         # 日志文件路径
         log_dir = self.args.logging_dir or "./logs"
         os.makedirs(log_dir, exist_ok=True)
@@ -80,27 +81,22 @@ class CustomTrainerAVTStage1(SFTTrainer):
         self._stu_ce_steps = 0
                 
     def alignment_loss(self, student_reps_all_layers, teacher_reps_all_layers):
-        total_loss = 0.
         layerwise_sim_record = []
-        bsz = len(student_reps_all_layers[0])
+        bsz = len(student_reps_all_layers[0]) if len(student_reps_all_layers) > 0 else 1
+        total_loss = 0.0
         for student_reps_l, teacher_reps_l in zip(student_reps_all_layers, teacher_reps_all_layers):
-            layer_loss = 0.
-            layerwise_sim = 0.
+            layer_loss = 0.0
+            layerwise_sim = 0.0
             for student_rep_l_b, teacher_rep_l_b in zip(student_reps_l, teacher_reps_l):
                 if student_rep_l_b.shape[0] == 0 or teacher_rep_l_b.shape[0] == 0:
                     continue
                 # 避免零范数导致 NaN，增加 eps
                 sim = torch.nn.functional.cosine_similarity(student_rep_l_b, teacher_rep_l_b, eps=1e-6).mean()
-                layer_loss += 1 - sim
-                layerwise_sim += sim.item()
-            total_loss += layer_loss/ bsz
-            layerwise_sim_record.append(layerwise_sim / bsz)
-        total_loss = total_loss / len(student_reps_all_layers)
-        '''if torch.isnan(total_loss):
-            #print("student_reps_all_layers =", student_reps_all_layers)
-            #print("teacher_reps_all_layers =", teacher_reps_all_layers)
-            print("student_poss =",student_poss)
-            print("teacher_poss =",teacher_poss)'''
+                layer_loss += (1 - sim)
+                layerwise_sim += float(sim.detach().item())
+            total_loss += layer_loss / max(1, bsz)
+            layerwise_sim_record.append(layerwise_sim / max(1, bsz))
+        total_loss = total_loss / max(1, len(student_reps_all_layers))
         return total_loss
         #if return_outputs:
         #    return {"total_loss": loss, "ce_loss": ce_loss, "sim_loss": sim_loss}, outputs
@@ -381,7 +377,7 @@ class CustomTrainerSFT(SFTTrainer):
 
 class CustomTrainerAVT_V2_Stage1(SFTTrainer):
     def __init__(self, *args, **kwargs):
-        self.exp_name =kwargs.pop('exp_name')
+        self.exp_name = kwargs.pop('exp_name')
         # accept processing_class (preferred) and fall back to tokenizer for backward compat
         if 'processing_class' not in kwargs and 'tokenizer' in kwargs:
             kwargs['processing_class'] = kwargs.pop('tokenizer')
@@ -432,6 +428,58 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         self.observation_token_acc = 0.
         self.observation_token_acc_step = 0
 
+        # Cache special token ids for attention attribution
+        try:
+            _tok = getattr(self, 'processing_class', None)
+            _tok = getattr(_tok, 'tokenizer', None)
+            if _tok is not None:
+                # Each returns a 1x1 tensor, take scalar id
+                self._img_pad_id = int(_tok("<|image_pad|>", return_tensors="pt")["input_ids"][0][0].item())
+                self._latent_pad_id = int(_tok("<abs_vis_token_pad>", return_tensors="pt")["input_ids"][0][0].item())
+            else:
+                # Fallback to config-known latent id if tokenizer missing
+                self._img_pad_id = None
+                self._latent_pad_id = int(getattr(self.model.config, 'latent_token_id', -1))
+        except Exception:
+            self._img_pad_id = None
+            self._latent_pad_id = int(getattr(self.model.config, 'latent_token_id', -1))
+
+        # Rolling accumulators for logging
+        self._obs_to_img_att_cum = 0.0
+        self._obs_to_img_att_steps = 0
+        self._obs_to_latent_att_cum = 0.0
+        self._obs_to_latent_att_steps = 0
+        # New: rolling accumulators for question image vs rest images, latent, and other-prev tokens
+        self._obs_to_qimg_att_mean_cum = 0.0
+        self._obs_to_qimg_att_mean_steps = 0
+        self._obs_to_qimg_att_sum_cum = 0.0
+        self._obs_to_qimg_att_sum_steps = 0
+
+        self._obs_to_img_rest_att_mean_cum = 0.0
+        self._obs_to_img_rest_att_mean_steps = 0
+        self._obs_to_img_rest_att_sum_cum = 0.0
+        self._obs_to_img_rest_att_sum_steps = 0
+
+        self._obs_to_latent_att_sum_cum = 0.0  # keeping existing mean; add sum
+        self._obs_to_latent_att_sum_steps = 0
+
+        self._obs_to_other_prev_att_mean_cum = 0.0
+        self._obs_to_other_prev_att_mean_steps = 0
+        self._obs_to_other_prev_att_sum_cum = 0.0
+        self._obs_to_other_prev_att_sum_steps = 0
+
+        # Keep last-per-layer attention stats for saving at log step
+        self._last_attn_layer_stats = None  # dict or None
+        self._attn_save_dir = os.path.join(self.args.logging_dir or './logs', 'attn_analysis')
+        os.makedirs(self._attn_save_dir, exist_ok=True)
+        # Rolling avg for auxiliary emphasize_latent_attn loss
+        self._emph_loss_cum = 0.0
+        self._emph_steps = 0
+
+        # align vision latent loss
+        self.align_vision_latent_loss_cum = 0.
+        self.align_vision_latent_loss_steps = 0
+
     def _current_ce_emphasize_factor(self) -> float:
         """Linear warmup from 1.0 -> target over N steps or ratio of total steps.
 
@@ -459,9 +507,6 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         """
         Compute training loss and additionally compute token accuracies
         """
-        '''if self.is_main_process:
-            torch.cuda.synchronize()
-            start_time = time()'''
         inputs['stage'] = 'avt_v2_stage1'
         inputs['latent_mode'] = True
         inputs['loss_type'] = []
@@ -470,8 +515,253 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         '''if self.is_main_process:
             time_1 = time()
             print(f"latent forward time {time_1 - start_time}")'''
+        # Separate, no_grad forward for attention analysis (interval-gated) BEFORE enabling grad checkpointing
+        # This ensures no state toggles between training forward and backward.
+        if getattr(self.args, 'attn_analysis', False):
+            try:
+                step_now = int(getattr(self.state, 'global_step', 0) or 0)
+                interval = int(getattr(self.args, 'attn_analysis_interval', 0) or getattr(self.args, 'logging_steps', 0) or 50)
+                if interval <= 0:
+                    interval = 50
+                if (step_now % interval) == 0:
+                    analysis_inputs = dict(inputs)
+                    analysis_inputs['output_attentions'] = True
+                    analysis_inputs['attn_analysis'] = True
+                    analysis_inputs['loss_type'] = []
+                    analysis_inputs['labels'] = None
+                    analysis_inputs['latent_mode'] = False
+                    analysis_inputs['ce_patch_pos'] = outputs.ce_patch_pos
+                    analysis_inputs['ce_patch_vec'] = outputs.ce_patch_vec
+                    bool_attn_mask_4d = inputs['attention_mask_4d']['full_attention']
+                    analysis_inputs['attention_mask_4d'] = {"full_attention": (~bool_attn_mask_4d).float()*-1e7}
+                    prev_attn_impl = getattr(model.config, '_attn_implementation', None)
+                    was_training = model.training
+                    model.eval()
+                    model.config._attn_implementation = 'eager'
+
+                    with torch.no_grad():
+                        analysis_out = model(**analysis_inputs, return_dict=True, output_hidden_states=False)
+
+                    atts = getattr(analysis_out, 'attentions', None)
+                    input_ids = analysis_inputs.get('input_ids', None)
+                    obs_poss = inputs.get('observation_poss', None)
+                    if atts is not None and input_ids is not None and obs_poss is not None and len(atts) > 0:
+                        layers = []
+                        for a in atts:
+                            t = a[0] if isinstance(a, (list, tuple)) else a
+                            if torch.is_tensor(t) and t.dim() == 4:
+                                layers.append(t)
+                        if len(layers) > 0:
+                            B, H, S, _ = layers[0].shape
+                            device = layers[0].device
+                            ids = input_ids.to(device)
+                            # Build obs/query mask (B,S)
+                            obs_mask = torch.zeros((B, S), dtype=torch.bool, device=device)
+                            for b, poss in enumerate(obs_poss):
+                                if poss is None:
+                                    continue
+                                valid = [p for p in poss if isinstance(p, int) and 0 <= p < S]
+                                if len(valid) > 0:
+                                    obs_mask[b, torch.tensor(valid, device=device, dtype=torch.long)] = True
+
+                            # Image masks
+                            img_mask = (ids == self._img_pad_id).to(device) if self._img_pad_id is not None else None
+                            # Split question image vs rest images per sample: first contiguous block of img tokens
+                            qimg_mask = None
+                            img_rest_mask = None
+                            if img_mask is not None:
+                                qimg_mask = torch.zeros_like(img_mask)
+                                img_rest_mask = torch.zeros_like(img_mask)
+                                for b in range(B):
+                                    row = img_mask[b]
+                                    idx = (row.nonzero(as_tuple=False).flatten())
+                                    if idx.numel() == 0:
+                                        continue
+                                    start = int(idx[0].item())
+                                    # extend contiguous block
+                                    end = start
+                                    while end + 1 < row.numel() and row[end + 1].item():
+                                        end += 1
+                                    qimg_mask[b, start : end + 1] = True
+                                    # rest are all other image positions
+                                    if idx.numel() > (end - start + 1):
+                                        img_rest_mask[b] = row & (~qimg_mask[b])
+                    # Latent masks
+                    latent_mask = (ids == self._latent_pad_id).to(device) if (self._latent_pad_id is not None and self._latent_pad_id >= 0) else None
+                    # Other (non-image, non-latent) masks
+                    other_mask = None
+                    if img_mask is not None or latent_mask is not None:
+                        other_mask = torch.ones((B, S), dtype=torch.bool, device=device)
+                        if img_mask is not None:
+                            other_mask &= (~img_mask)
+                        if latent_mask is not None:
+                            other_mask &= (~latent_mask)
+
+                    # Strictly lower triangular mask for k < q (S,S)
+                    tril = torch.tril(torch.ones((S, S), dtype=torch.bool, device=device), diagonal=-1)
+
+                    def _mean_and_sum(att: torch.Tensor, mask_k: torch.Tensor, restrict_prev: bool = False):
+                        """
+                        mean: 与原先一致，按 (B,H,q,k) 对所有有效 pair 求平均（再对 batch 取平均）。
+                        sum: 按需求修改：先对同一个 query 的该类 key 做 sum（跨 k），
+                             然后对所有 query 做平均（再对头与 batch 做平均）。
+                        """
+                        if mask_k is None:
+                            return None, None
+                        # Masks
+                        q_mask_b1qs1 = obs_mask[:, None, :, None]  # (B,1,S,1)
+                        k_mask_b11s  = mask_k[:, None, None, :]    # (B,1,1,S)
+                        pair_mask = q_mask_b1qs1 & k_mask_b11s     # (B,1,S,S)
+                        if restrict_prev:
+                            pair_mask = pair_mask & tril[None, None, :, :]
+
+                        # If no valid pairs, return Nones
+                        num_pairs = pair_mask.sum(dim=(1, 2, 3))  # (B,)
+                        if (num_pairs == 0).all():
+                            return None, None
+
+                        # mean over pairs and heads (old definition)
+                        masked_sum_all = (att * pair_mask).sum(dim=(1, 2, 3))  # (B,)
+                        denom = num_pairs * max(1, H)
+                        mean_b = masked_sum_all / denom.clamp_min(1)
+                        valid_b = num_pairs > 0
+                        mean_val = mean_b[valid_b].mean() if valid_b.any() else None
+
+                        # sum metric (new definition):
+                        # 1) per-query sum over keys in category: sum_k att[b,h,q,k]
+                        #    pair_mask ensures only selected keys and queries contribute.
+                        per_q_sum = (att * pair_mask).sum(dim=-1)  # (B,H,S)
+                        # 2) average across queries (only where obs_mask True)
+                        obs_mask_bhs = obs_mask[:, None, :]  # (B,1,S)
+                        q_count = obs_mask.sum(dim=-1)       # (B,)
+                        # Avoid div by 0: only keep batches with q_count>0
+                        if (q_count > 0).any():
+                            # Sum over queries then divide by #queries per batch
+                            per_bh_avg = (per_q_sum * obs_mask_bhs).sum(dim=-1)  # (B,H)
+                            per_bh_avg = per_bh_avg / q_count.clamp_min(1)[:, None]
+                            # 3) average across heads, then across valid batches
+                            per_b_avg = per_bh_avg.mean(dim=1)  # (B)
+                            valid_q = q_count > 0
+                            sum_val = per_b_avg[valid_q].mean() if valid_q.any() else None
+                        else:
+                            sum_val = None
+
+                        return mean_val, sum_val
+
+                    # Per-layer arrays to save
+                    L = len(layers)
+                    per_layer = {
+                        'mean_qimg': torch.full((L,), float('nan')),
+                        'sum_qimg': torch.full((L,), float('nan')),
+                        'mean_img_rest': torch.full((L,), float('nan')),
+                        'sum_img_rest': torch.full((L,), float('nan')),
+                        'mean_latent': torch.full((L,), float('nan')),
+                        'sum_latent': torch.full((L,), float('nan')),
+                        'mean_other_prev': torch.full((L,), float('nan')),
+                        'sum_other_prev': torch.full((L,), float('nan')),
+                    }
+
+                    for li, att in enumerate(layers):
+                        # Compute metrics
+                        m_qimg, s_qimg = _mean_and_sum(att, qimg_mask, restrict_prev=False)
+                        m_img_r, s_img_r = _mean_and_sum(att, img_rest_mask, restrict_prev=False)
+                        m_lat, s_lat = _mean_and_sum(att, latent_mask, restrict_prev=False)
+                        m_oth, s_oth = _mean_and_sum(att, other_mask, restrict_prev=True)
+
+                        if m_qimg is not None and torch.isfinite(m_qimg):
+                            per_layer['mean_qimg'][li] = m_qimg.detach().float()
+                        if s_qimg is not None and torch.isfinite(s_qimg):
+                            per_layer['sum_qimg'][li] = s_qimg.detach().float()
+                        if m_img_r is not None and torch.isfinite(m_img_r):
+                            per_layer['mean_img_rest'][li] = m_img_r.detach().float()
+                        if s_img_r is not None and torch.isfinite(s_img_r):
+                            per_layer['sum_img_rest'][li] = s_img_r.detach().float()
+                        if m_lat is not None and torch.isfinite(m_lat):
+                            per_layer['mean_latent'][li] = m_lat.detach().float()
+                        if s_lat is not None and torch.isfinite(s_lat):
+                            per_layer['sum_latent'][li] = s_lat.detach().float()
+                        if m_oth is not None and torch.isfinite(m_oth):
+                            per_layer['mean_other_prev'][li] = m_oth.detach().float()
+                        if s_oth is not None and torch.isfinite(s_oth):
+                            per_layer['sum_other_prev'][li] = s_oth.detach().float()
+
+                    # Update rolling accumulators with last layer (for quick scalar logging, similar to previous behavior)
+                    last_idx = len(layers) - 1
+                    def _nan_to_none(x: torch.Tensor):
+                        return None if (x.numel()==0 or not torch.isfinite(x)) else x
+                    m_qimg = _nan_to_none(per_layer['mean_qimg'][last_idx])
+                    m_img_r = _nan_to_none(per_layer['mean_img_rest'][last_idx])
+                    m_lat = _nan_to_none(per_layer['mean_latent'][last_idx])
+                    m_oth = _nan_to_none(per_layer['mean_other_prev'][last_idx])
+                    s_qimg = _nan_to_none(per_layer['sum_qimg'][last_idx])
+                    s_img_r = _nan_to_none(per_layer['sum_img_rest'][last_idx])
+                    s_lat = _nan_to_none(per_layer['sum_latent'][last_idx])
+                    s_oth = _nan_to_none(per_layer['sum_other_prev'][last_idx])
+
+                    if m_qimg is not None:
+                        self._obs_to_qimg_att_mean_cum += float(m_qimg.item())
+                        self._obs_to_qimg_att_mean_steps += 1
+                    if s_qimg is not None:
+                        self._obs_to_qimg_att_sum_cum += float(s_qimg.item())
+                        self._obs_to_qimg_att_sum_steps += 1
+                    if m_img_r is not None:
+                        self._obs_to_img_rest_att_mean_cum += float(m_img_r.item())
+                        self._obs_to_img_rest_att_mean_steps += 1
+                    if s_img_r is not None:
+                        self._obs_to_img_rest_att_sum_cum += float(s_img_r.item())
+                        self._obs_to_img_rest_att_sum_steps += 1
+                    if m_lat is not None:
+                        self._obs_to_latent_att_cum += float(m_lat.item())
+                        self._obs_to_latent_att_steps += 1
+                    if s_lat is not None:
+                        self._obs_to_latent_att_sum_cum += float(s_lat.item())
+                        self._obs_to_latent_att_sum_steps += 1
+                    if m_oth is not None:
+                        self._obs_to_other_prev_att_mean_cum += float(m_oth.item())
+                        self._obs_to_other_prev_att_mean_steps += 1
+                    if s_oth is not None:
+                        self._obs_to_other_prev_att_sum_cum += float(s_oth.item())
+                        self._obs_to_other_prev_att_sum_steps += 1
+
+                    # Stash per-layer arrays for saving at log step
+                    self._last_attn_layer_stats = {
+                        'global_step': int(getattr(self.state, 'global_step', 0) or 0),
+                        'per_layer': {k: v.cpu().numpy() for k, v in per_layer.items()},
+                    }
+                    # Restore impl and training mode
+                    try:
+                        model.config._attn_implementation = prev_attn_impl
+                    except Exception:
+                        pass
+                    if was_training:
+                        try:
+                            model.train()
+                        except Exception:
+                            pass
+
+            except Exception:
+                pass
+
+        # After analysis, run the CE training forward with grad checkpointing enabled and use_cache disabled
+        # Enforce use_cache=False to avoid recompute mismatches with checkpointing
+        try:
+            if getattr(model.config, 'use_cache', None) is not False:
+                model.config.use_cache = False
+        except Exception:
+            pass
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         #inputs['enable_ce_checkpoint'] = True
+
+        # test
+        '''alpha = torch.tensor(1.0, device=outputs.ce_patch_vec[0][0].device, requires_grad=True)
+        scaled = []
+        for row in outputs.ce_patch_vec:
+            row.retain_grad()
+            sv = alpha * row       # connects pass-2 loss to pass-1 via 'row'
+            sv.retain_grad()       # non-leaf; keep its grad so we can inspect
+            scaled.append(sv)  # use detach() to isolate only this path'''
+
+
         inputs['latent_mode'] = False
         inputs['ce_patch_pos'] = outputs.ce_patch_pos
         inputs['ce_patch_vec'] = outputs.ce_patch_vec
@@ -479,20 +769,72 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         # Dynamic warmup factor passed to model.forward
         inputs['ce_emphasize_factor'] = self._current_ce_emphasize_factor()
         inputs['loss_type'] = ['ce']
+        
+        # Decide whether to also compute emphasize_latent_attn in same forward
+        use_emph = bool(getattr(self.args, 'use_emphasize_latent_attn_loss', False))
+        emph_coef = float(getattr(self.args, 'emphasize_latent_attn_coef', 1.0)) 
+        if use_emph:
+            inputs['loss_type'].append('emphasize_latent_attn')
+            inputs['collect_emphasize_attn'] = True
+            # which query tokens to use (default observation_poss)
+            inputs['emphasize_query_poss'] = inputs.get('observation_poss', None)
+            inputs['emphasize_topk_layers'] = self.args.emphasize_topk_layers
+            inputs['attn_loss_layers'] = self.args.attn_loss_layers
+        
+        if self.args.use_align_vision_latent_loss_projector:
+            inputs['loss_type'].append('align_vision_latent_projector')
+            inputs['latent_size'] = self.args.latent_size
+
+        if self.args.use_align_vision_latent_loss_pooling:
+            inputs['loss_type'].append('align_vision_latent_pooling')
+            inputs['latent_size'] = self.args.latent_size
+
         inputs['compute_emphasize_acc'] = True
-        '''(teacher_ce_loss, teacher_outputs) = super().compute_loss(
-                model, 
-                inputs,
-                return_outputs=True, num_items_in_batch=num_items_in_batch
-            )'''
+        # Ensure training forward does NOT request attentions (prevents checkpoint recompute mismatch)
+        inputs.pop('output_attentions', None)
+        inputs.pop('attn_analysis', None)
+        
+        # Force eager attention to ensure attention weights are available when computing emphasize loss
+        prev_impl_train = getattr(model.config, '_attn_implementation', None)
+
         teacher_ce_loss, teacher_output = super().compute_loss(
                 model, 
                 inputs,
                 return_outputs=True, num_items_in_batch=num_items_in_batch
             )
-        if teacher_output.mean_emphasize_acc is not None:
-            self.observation_token_acc += teacher_output.mean_emphasize_acc
+
+        # If auxiliary loss is present, combine here
+        total_loss = teacher_ce_loss
+        emph_loss_val = None
+        if use_emph and hasattr(teacher_output, 'loss_dict') and isinstance(teacher_output.loss_dict, dict):
+            emph = teacher_output.loss_dict.get('emphasize_latent_attn', None)
+            if emph is not None:
+                emph_loss_val = float(emph.detach().item())
+                # Combine into the returned loss
+                total_loss = teacher_ce_loss + emph * emph_coef
+                # accumulate for logging
+                self._emph_loss_cum += emph_loss_val
+                self._emph_steps += 1
+        
+        if getattr(teacher_output, 'mean_emphasize_acc', None) is not None:
+            self.observation_token_acc += getattr(teacher_output, 'mean_emphasize_acc')
             self.observation_token_acc_step += 1
+
+        if self.args.use_align_vision_latent_loss_projector:
+            align_vision_latent_loss = teacher_output.loss_dict['align_vision_latent_projector']
+            total_loss += self.args.align_vision_latent_loss_weight * align_vision_latent_loss
+            self.align_vision_latent_loss_cum += align_vision_latent_loss.item()
+            self.align_vision_latent_loss_steps += 1
+        
+        if self.args.use_align_vision_latent_loss_pooling:
+            align_vision_latent_loss = teacher_output.loss_dict['align_vision_latent_pooling']
+            total_loss += self.args.align_vision_latent_loss_weight * align_vision_latent_loss
+            self.align_vision_latent_loss_cum += align_vision_latent_loss.item()
+            self.align_vision_latent_loss_steps += 1
+
+        # For return_outputs == True, we must return our combined loss
+        if return_outputs:
+            return (total_loss, None)
 
         # Light-touch cleanup without forcing GPU sync every step
         #del teacher_outputs
@@ -505,7 +847,20 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
             except Exception:
                 pass
         
-        return (teacher_ce_loss, None) if return_outputs else teacher_ce_loss
+        '''# test
+        total_loss.backward()
+        # A) Does CE depend on the injected branch?
+        print("dL/dalpha:", float(alpha.grad.detach().cpu()))
+
+        # B) Did gradients flow back to the ORIGINAL pass-1 vectors?
+        row_norms = [None if r.grad is None else float(r.grad.norm().cpu()) for r in outputs.ce_patch_vec]
+        print("||grad on pass-1 rows||:", row_norms)
+
+        # C) Do the injected tensors themselves carry gradients?
+        sv_norms = [None if s.grad is None else float(s.grad.norm().cpu()) for s in scaled]
+        print("||grad on injected scaled vecs||:", sv_norms)'''
+        return total_loss
+
 
     def on_epoch_end(self):
         # 注意：HF Trainer 不会自动调用子类自定义的 on_epoch_end；实际汇总通过回调实现。
@@ -516,10 +871,76 @@ class CustomTrainerAVT_V2_Stage1(SFTTrainer):
         merged = dict(logs)
         if self.observation_token_acc_step > 0:
             merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
+            self.observation_token_acc = 0.
+            self.observation_token_acc_step = 0
 
-        # Reset accumulators after logging so the next window starts fresh
-        self.observation_token_acc = 0.
-        self.observation_token_acc_step = 0
+        if getattr(self.args, 'attn_analysis', False):
+            # new metrics
+            if self._obs_to_qimg_att_mean_steps > 0:
+                merged["obs_to_qimg_att_mean"] = round(self._obs_to_qimg_att_mean_cum / max(1, self._obs_to_qimg_att_mean_steps), 8)
+            if self._obs_to_qimg_att_sum_steps > 0:
+                merged["obs_to_qimg_att_sum"] = round(self._obs_to_qimg_att_sum_cum / max(1, self._obs_to_qimg_att_sum_steps), 8)
+            if self._obs_to_img_rest_att_mean_steps > 0:
+                merged["obs_to_img_rest_att_mean"] = round(self._obs_to_img_rest_att_mean_cum / max(1, self._obs_to_img_rest_att_mean_steps), 8)
+            if self._obs_to_img_rest_att_sum_steps > 0:
+                merged["obs_to_img_rest_att_sum"] = round(self._obs_to_img_rest_att_sum_cum / max(1, self._obs_to_img_rest_att_sum_steps), 8)
+            if self._obs_to_latent_att_steps > 0:
+                merged["obs_to_latent_att_mean"] = round(self._obs_to_latent_att_cum / max(1, self._obs_to_latent_att_steps), 8)
+            if self._obs_to_latent_att_sum_steps > 0:
+                merged["obs_to_latent_att_sum"] = round(self._obs_to_latent_att_sum_cum / max(1, self._obs_to_latent_att_sum_steps), 8)
+            if self._obs_to_other_prev_att_mean_steps > 0:
+                merged["obs_to_other_prev_att_mean"] = round(self._obs_to_other_prev_att_mean_cum / max(1, self._obs_to_other_prev_att_mean_steps), 8)
+            if self._obs_to_other_prev_att_sum_steps > 0:
+                merged["obs_to_other_prev_att_sum"] = round(self._obs_to_other_prev_att_sum_cum / max(1, self._obs_to_other_prev_att_sum_steps), 8)
+
+            # Save per-layer stats for this log step (without pushing to W&B merged)
+            if self._last_attn_layer_stats is not None and isinstance(self._last_attn_layer_stats, dict):
+                step = int(self._last_attn_layer_stats.get('global_step', 0) or 0)
+                per_layer = self._last_attn_layer_stats.get('per_layer', {})
+                try:
+                    np.savez_compressed(
+                        os.path.join(self._attn_save_dir, f"attn_layers_step_{step:08d}.npz"),
+                        **per_layer,
+                        step=step,
+                    )
+                except Exception:
+                    pass
+                # do not reset here; keep last for potential later use
+            self._obs_to_img_att_cum = 0.0
+            self._obs_to_img_att_steps = 0
+            self._obs_to_latent_att_cum = 0.0
+            self._obs_to_latent_att_steps = 0
+            self._obs_to_qimg_att_mean_cum = 0.0
+            self._obs_to_qimg_att_mean_steps = 0
+            self._obs_to_qimg_att_sum_cum = 0.0
+            self._obs_to_qimg_att_sum_steps = 0
+            self._obs_to_img_rest_att_mean_cum = 0.0
+            self._obs_to_img_rest_att_mean_steps = 0
+            self._obs_to_img_rest_att_sum_cum = 0.0
+            self._obs_to_img_rest_att_sum_steps = 0
+            self._obs_to_latent_att_sum_cum = 0.0
+            self._obs_to_latent_att_sum_steps = 0
+            self._obs_to_other_prev_att_mean_cum = 0.0
+            self._obs_to_other_prev_att_mean_steps = 0
+            self._obs_to_other_prev_att_sum_cum = 0.0
+            self._obs_to_other_prev_att_sum_steps = 0
+
+        if self._emph_steps > 0:
+            merged['emphasize_latent_attn_loss'] = round(self._emph_loss_cum / max(1, self._emph_steps), 8)
+            self._emph_loss_cum = 0.0
+            self._emph_steps = 0
+
+        if self.args.use_align_vision_latent_loss_projector:
+            if self.align_vision_latent_loss_steps and self.align_vision_latent_loss_steps > 0:
+                merged['align_vision_latent_loss_projector'] = round(self.align_vision_latent_loss_cum / max(1, self.align_vision_latent_loss_steps), 8)
+            self.align_vision_latent_loss_cum = 0.0
+            self.align_vision_latent_loss_steps = 0
+
+        if self.args.use_align_vision_latent_loss_pooling:
+            if self.align_vision_latent_loss_steps and self.align_vision_latent_loss_steps > 0:
+                merged['align_vision_latent_loss_pooling'] = round(self.align_vision_latent_loss_cum / max(1, self.align_vision_latent_loss_steps), 8)
+            self.align_vision_latent_loss_cum = 0.0
+            self.align_vision_latent_loss_steps = 0
 
         # Call parent to keep default behavior (console/TB/W&B/etc.)
         return super().log(merged, start_time)

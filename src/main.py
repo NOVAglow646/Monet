@@ -156,6 +156,7 @@ SPECIAL_id = {
     "abs_pad": latent_pad_idx,
     "obs_start": observation_start_idx,
     "obs_end": observation_end_idx,
+    "ans_start": answer_start_pattern
 }
 
 model.config.latent_token_id = int(latent_pad_idx)
@@ -385,14 +386,20 @@ def collate_fn_avt_v2_stage1(examples):
     assert total_image_pads == len(image_inputs)
     batch = processor(text=texts, images=image_inputs, return_tensors="pt", padding=True)
 
-    batch["attention_mask_4d"] = {"full_attention": build_additive_bias(
-        input_ids=batch["input_ids"],
-        pad_mask=batch["attention_mask"],
-        token_ids=SPECIAL_id,
-        large_neg=-1e5,
-        mask_latent=getattr(args, 'mask_latent', False),
-        observation_tokens_cannot_see_question_image=getattr(args, 'observation_tokens_cannot_see_question_image', False)
-    ) }
+    if not args.not_use_4d:
+        attn_mask_4d, batch['segs'] = build_4d_attn(
+            input_ids=batch["input_ids"],
+            pad_mask=batch["attention_mask"],
+            token_ids=SPECIAL_id,
+            not_mask_image=getattr(args, 'not_mask_image', False),
+            mask_latent=getattr(args, 'mask_latent', False),
+            observation_tokens_cannot_see_question_image=getattr(args, 'observation_tokens_cannot_see_question_image', False),
+            observation_tokens_only_see_question_and_latent=getattr(args, 'observation_tokens_only_see_question_and_latent', False),
+            latent_can_see_all_previous=args.latent_can_see_all_previous,
+            return_type='bool',
+            mask_question_image=args.mask_question_image
+        )
+        batch["attention_mask_4d"] = {"full_attention": attn_mask_4d }
 
     
     observation_start_poss = find_ids_poss(batch["input_ids"], answer_start_pattern, observation_start_idx)
@@ -407,7 +414,11 @@ def collate_fn_avt_v2_stage1(examples):
                 poss_of_a_sample.extend(list(range(start+1, end)))
         batch["observation_poss"].append(poss_of_a_sample)
 
-    batch["labels"] = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, latent_pad_idx, img_pad_idx,  img_start_idx, img_end_idx, observation_start_idx, observation_end_idx])
+    if args.only_predict_obs:
+        batch["labels"] = generate_labels_after_multi_token_start_only_allow(batch["input_ids"], answer_start_pattern, allowed_poss=batch["observation_poss"])
+    else:
+        batch["labels"] = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, 
+        latent_pad_idx, img_pad_idx,  img_start_idx, img_end_idx, observation_start_idx, observation_end_idx])
     '''if _rank==0:
         time_1 = time()
         print(f"collate time {time_1 - start_time}")'''
@@ -574,8 +585,8 @@ training_args = SFTConfig(
     weight_decay=0.01,
     logging_steps=1,
     save_strategy="steps",
-    save_steps=200,
-    save_total_limit=5,
+    save_steps=50,
+    save_total_limit=3,
     optim="adamw_torch_fused",
     bf16=True,
     push_to_hub=False,
@@ -600,20 +611,19 @@ training_args = SFTConfig(
 )
 
 # ---- Inject custom SFT analysis flags into training_args so CustomTrainerSFT can access them ----
-if args.stage == 'avt_sft':
-    setattr(training_args, 'sft_analysis_enable', args.sft_analysis_enable)
-    setattr(training_args, 'sft_analysis_save_dir', args.sft_analysis_save_dir)
-    setattr(training_args, 'sft_analysis_categories', args.sft_analysis_categories)
-    setattr(training_args, 'dataset_names', dataset_names)
-    setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
-    setattr(training_args, 'ce_emphasize_warmup_steps', args.ce_emphasize_warmup_steps)
-    setattr(training_args, 'exp_name', exp_name)
-elif args.stage == 'avt_stage1':
-    setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
-    setattr(training_args, 'alignment_weight', args.alignment_weight)
-elif args.stage == 'avt_v2_stage1':
+if args.stage == 'avt_v2_stage1':
     setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
     setattr(training_args, 'gradient_checkpointing_kwargs', {"use_reentrant": False})
+    setattr(training_args, 'attn_analysis', args.attn_analysis)
+    setattr(training_args, 'use_emphasize_latent_attn_loss', args.use_emphasize_latent_attn_loss)
+    setattr(training_args, 'emphasize_latent_attn_coef', args.emphasize_latent_attn_coef)
+    setattr(training_args, 'emphasize_topk_layers', args.emphasize_topk_layers)
+    setattr(training_args, 'attn_loss_layers', args.attn_loss_layers)
+    setattr(training_args, 'use_align_vision_latent_loss_projector', args.use_align_vision_latent_loss_projector)
+    setattr(training_args, 'use_align_vision_latent_loss_pooling', args.use_align_vision_latent_loss_pooling)
+    setattr(training_args, 'align_vision_latent_loss_weight', args.align_vision_latent_loss_weight)
+    setattr(training_args, 'latent_size', args.latent_size)
+    
 elif args.stage == 'avt_v2_stage2':
     setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
     setattr(training_args, 'alignment_weight', args.alignment_weight)

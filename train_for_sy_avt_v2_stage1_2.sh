@@ -3,9 +3,9 @@ export NCCL_IB_DISABLE=0
 export NCCL_IB_GID_INDEX=3
 export NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9
 
-LATENT_SIZE=10
-CE_EMPHASIZE_FACTOR=3.0
-SAVE_CKPT=9.2-avt_v2_stage1-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}-obs_cannot_see_qimg-mask_latent
+LATENT_SIZE=24
+CE_EMPHASIZE_FACTOR=5.0
+SAVE_CKPT=9.6-avt_v2_stage1-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}-mask_qimg-lat_see_pre-mask_latent
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
@@ -28,7 +28,8 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
   --dataset_root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
   --wandb_name ${SAVE_CKPT} \
-  --observation_tokens_cannot_see_question_image \
+  --mask_question_image \
+  --latent_can_see_all_previous \
   --mask_latent
 
   
