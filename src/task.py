@@ -138,8 +138,8 @@ def avt_single_input_images_preprocess_function(sample, dataset_root=""):
             elif content["type"] == "text" and step["role"] == "assistant":
                 # Validate that any observation text must be preceded by an assistant image within the same step
                 if "<observation>" in content.get("text", "") and not seen_assistant_image:
-                    return None
-            
+                    content['text'] = content['text'].replace("<observation>", "").replace("</observation>", "")
+
             new_step["content"][j] = content
         conversations[i] = new_step
     sample["data"] = conversations

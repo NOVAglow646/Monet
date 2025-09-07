@@ -6,7 +6,7 @@ export NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9
 LATENT_SIZE=24
 CE_EMPHASIZE_FACTOR=5.0
 ALIGN_VISION_LATENT_LOSS_WEIGHT=0.0001
-SAVE_CKPT=9.7-avt_v2_stage1-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}-mask_qimg-lat_see_pre-align_vis_lat_proj${ALIGN_VISION_LATENT_LOSS_WEIGHT}
+SAVE_CKPT=9.7-avt_v2_stage1-latent${LATENT_SIZE}-ce_factor${CE_EMPHASIZE_FACTOR}-mask_qimg-align_vis_lat_proj${ALIGN_VISION_LATENT_LOSS_WEIGHT}
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
@@ -30,7 +30,6 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
   --wandb_name ${SAVE_CKPT} \
   --mask_question_image \
-  --latent_can_see_all_previous \
   --use_align_vision_latent_loss_projector \
   --align_vision_latent_loss_weight ${ALIGN_VISION_LATENT_LOSS_WEIGHT}
 
