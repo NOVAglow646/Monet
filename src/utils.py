@@ -24,7 +24,7 @@ def get_args():
     parser.add_argument("--deepspeed", type=str, default="",
                         help="Path to DeepSpeed config JSON, e.g., ./deepspeed/ds_zero2_cpu_offload.json")
     parser.add_argument("--num_samples", default=-1, help="-1 means all data", type=int)
-
+    parser.add_argument("--max_seq_len", type=int, default=4096, help="Maximum allowed sequence length after processing.")
     # ===== Basic training hyperparameters =====
     parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate for training.")
     parser.add_argument("--bsz", type=int, default=1, help="Batch size for training.")

@@ -45,8 +45,7 @@ def avt_single_input_images_preprocess_function(sample, dataset_root="", process
 
     return sample_copy, cur_max
 
-def filter_invalid_samples_in_json(json_path, dataset_root, processor, cur_max=-1, id=-1):
-    max_seq_len=3000
+def filter_invalid_samples_in_json(json_path, dataset_root, processor, cur_max=-1, id=-1, max_seq_len=4096):
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     filtered_data = []
@@ -59,10 +58,10 @@ def filter_invalid_samples_in_json(json_path, dataset_root, processor, cur_max=-
         if result is not None:
             filtered_data.append(result)
         else:
-            print(f"Removed sample from dataset: {dataset_name}")
+            #print(f"Removed sample from dataset: {dataset_name}")
             removed_count += 1
     if removed_count > 0:
-        with open(json_path.replace('.json',f'_short{max_seq_len}.json'), "w", encoding="utf-8") as f:
+        with open(json_path.replace('.json',f'_max_seq_len{max_seq_len}.json'), "w", encoding="utf-8") as f:
             json.dump(filtered_data, f, ensure_ascii=False, indent=2)
     return removed_count, cur_max
 
@@ -74,20 +73,24 @@ def main():
     total_id = 0
     for json_path in args.data_path:
         if os.path.isfile(json_path):
-            removed_count, cur_max = filter_invalid_samples_in_json(json_path, args.dataset_root, processor, cur_max=cur_max, id=total_id)
+            removed_count, cur_max = filter_invalid_samples_in_json(json_path, args.dataset_root, processor, cur_max=cur_max, id=total_id, max_seq_len=args.max_seq_len)
             total_id+=1
+            if removed_count > 0:
+                print(f"Processed {json_path}, removed {removed_count} samples due to exceeding max_seq_len {args.max_seq_len}.")
+    print(f"Final max_seq_len of all training data={cur_max}")
 
 if __name__ == "__main__":
     main()
 
 '''
 python remove_too_long.py \
-    --load_model_path /home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct-0812-avt_sft-shuffle \
-    --data_path \
-    "./new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train.json" \
-    "./new/created_dataset/filtered_data/Zebra_CoT_visual_search/filtered_train.json" \
-    "./new/created_dataset/filtered_data/Zebra_CoT_geometry/filtered_train.json" \
-    "./new/created_dataset/filtered_data/Zebra_CoT_maze/filtered_train.json" \
-    "./new/created_dataset/filtered_data/VTS_1/filtered_train.json" 
+    --max_seq_len 4096 \
+    --load_model_path /ytech_m2v5_hdd/workspace/kling_mm/Models/Qwen2.5-VL-7B-Instruct \
+    --data_path "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/CoM_w_MathVista/filtered_train_w_metadata_9.1.json" \
+    "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/ReFocus/filtered_train_w_metadata_9.1.json" \
+    "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_count/filtered_train_w_metadata_9.1.json" \
+    "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_visual_search/filtered_train_w_metadata_from_stage1_9.1.json" \
+    "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_geometry/filtered_train_w_metadata_9.1.json" \
+    "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_maze/filtered_train_short3000_w_metadata_9.1.json" \
 
 '''
