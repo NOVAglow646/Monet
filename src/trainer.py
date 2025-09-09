@@ -1127,7 +1127,7 @@ class CustomTrainerAVT_V3(SFTTrainer):
             not torch.distributed.is_initialized()
             or torch.distributed.get_rank() == 0
         )
-
+        self.align_loss_type = "pooling" if self.args.use_align_vision_latent_loss_pooling else "projector"
         self.observation_token_acc = 0.
         self.observation_token_acc_step = 0
         self.align_vision_latent_loss_cum = 0.
@@ -1148,7 +1148,8 @@ class CustomTrainerAVT_V3(SFTTrainer):
         inputs['labels'] = None
         inputs['alignment_poss'] = inputs['teacher_alignment_poss']
         model.gradient_checkpointing_disable()
-        inputs['loss_type'] = []
+        inputs['latent_size'] = self.args.latent_size
+        inputs['loss_type'] = [f'align_vision_latent_{self.align_loss_type}']
         inputs['segs'] = inputs['teacher_segs']
         inputs['output_helper_img_embeds'] = True
         with torch.no_grad():
@@ -1162,11 +1163,9 @@ class CustomTrainerAVT_V3(SFTTrainer):
         inputs['image_grid_thw'] = inputs['student_image_grid_thw']
         if 'labels' in inputs:
             inputs.pop('labels')
-        inputs['alignment_poss'] = inputs['student_alignment_poss']
-        inputs['teacher_hidden_states_for_alignment'] = teacher_outputs.latent_embeds
         model.gradient_checkpointing_disable()
-        inputs['loss_type'] = ['alignment']
         inputs['output_latent_embeds'] = False
+        inputs['output_helper_img_embeds'] = False
         inputs['segs'] = None
         inputs['loss_type'] = []
         student_outputs_latent = model(**inputs)
@@ -1175,13 +1174,14 @@ class CustomTrainerAVT_V3(SFTTrainer):
         inputs['latent_mode'] = False
         inputs['labels'] = inputs['student_labels']
         inputs['align_vision_latent_pre_result'] = teacher_outputs.align_vision_latent_pre_result
-        inputs['latent_size'] = self.args.latent_size
         inputs['ce_patch_pos'] = student_outputs_latent.ce_patch_pos
         inputs['ce_patch_vec'] = student_outputs_latent.ce_patch_vec
         inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
         inputs['ce_emphasize_poss'] = inputs['observation_poss']
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
-        inputs['loss_type'] = ['ce', 'align_vision_latent_projector']
+        inputs['loss_type'] = ['ce']
+        inputs['loss_type'].append(f'align_vision_latent_{self.align_loss_type}')
+
         inputs['compute_emphasize_acc'] = True
         if 'student_attention_mask_4d' in inputs:
             inputs['attention_mask_4d'] = inputs.pop('student_attention_mask_4d')
@@ -1192,7 +1192,7 @@ class CustomTrainerAVT_V3(SFTTrainer):
             self.observation_token_acc += getattr(student_outputs, 'mean_emphasize_acc')
             self.observation_token_acc_step += 1
         
-        align_vision_latent_loss = student_outputs.loss_dict['align_vision_latent_projector']
+        align_vision_latent_loss = student_outputs.loss_dict[f'align_vision_latent_{self.align_loss_type}']
         loss = student_ce_loss + self.args.align_vision_latent_loss_weight * align_vision_latent_loss
         outputs_student_loss = student_ce_loss.item()
 
@@ -1218,7 +1218,7 @@ class CustomTrainerAVT_V3(SFTTrainer):
         # Merge our rolling averages into the standard logs once per logging call
         merged = dict(logs)
         if self.align_vision_latent_loss_steps and self.align_vision_latent_loss_steps > 0:
-            merged['align_vision_latent_loss_pooling'] = round(self.align_vision_latent_loss_cum / max(1, self.align_vision_latent_loss_steps), 8)
+            merged[f'align_vision_latent_loss_{self.align_loss_type}'] = round(self.align_vision_latent_loss_cum / max(1, self.align_vision_latent_loss_steps), 8)
             self.align_vision_latent_loss_cum = 0.0
             self.align_vision_latent_loss_steps = 0
         if self._stu_ce_steps > 0:

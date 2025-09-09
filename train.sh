@@ -362,6 +362,7 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     --deepspeed ./deepspeed/ds_zero2_gpu.json \
     --latent_size ${LATENT_SIZE} \
     --ce_emphasize_factor ${CE_EMPHASIZE_FACTOR} \
-    --align_vision_latent_loss_weight ${ALIGN_VISION_LATENT_LOSS_WEIGHT}
+    --align_vision_latent_loss_weight ${ALIGN_VISION_LATENT_LOSS_WEIGHT} \
+    --use_align_vision_latent_loss_pooling
     
     

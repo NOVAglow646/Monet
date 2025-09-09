@@ -2505,8 +2505,8 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
         if segs is not None:
             kwargs['latent_size'] = latent_size
             kwargs['loss_type'] = loss_type
-            if len(loss_type) == 0: # avt_v3
-                kwargs['loss_type'] = ['align_vision_latent_projector']
+            if output_helper_img_embeds: # avt_v3 collect
+                loss_type = [] # only collect the pre results, don't compute loss
 
         outputs = self.model(
             input_ids=input_ids,

@@ -1236,8 +1236,6 @@ def find_segments_1d_wo_helper_images(ids, token_ids):
         O_idx may be empty if no <observation>...</observation> in T_i
     """
     L = ids.numel()
-    I_segments, A_segments, O_segments = [], [], []
-
     # Helper to collect indices between two tags (exclusive) that match 'wanted_id' (or all if None)
     def between(start_pos, end_pos, wanted_id=None):
         s = start_pos + 1

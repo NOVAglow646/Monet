@@ -802,8 +802,8 @@ training_args = SFTConfig(
     weight_decay=0.01,
     logging_steps=1,
     save_strategy="steps",
-    save_steps=50,
-    save_total_limit=3,
+    save_steps=300,
+    save_total_limit=5,
     optim="adamw_torch_fused",
     bf16=True,
     push_to_hub=False,
@@ -855,6 +855,8 @@ elif args.stage == 'avt_v3':
     setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
     setattr(training_args, 'alignment_weight', args.alignment_weight)
     setattr(training_args, 'gradient_checkpointing_kwargs', {"use_reentrant": False})
+    setattr(training_args, 'use_align_vision_latent_loss_projector', args.use_align_vision_latent_loss_projector)
+    setattr(training_args, 'use_align_vision_latent_loss_pooling', args.use_align_vision_latent_loss_pooling)
     setattr(training_args, 'align_vision_latent_loss_weight', args.align_vision_latent_loss_weight)
     setattr(training_args, 'latent_size', args.latent_size)
 
