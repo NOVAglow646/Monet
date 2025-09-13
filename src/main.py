@@ -863,6 +863,7 @@ elif args.stage in ['avt_v3', 'avt_v3_1']:
     setattr(training_args, 'use_align_vision_latent_loss_pooling', args.use_align_vision_latent_loss_pooling)
     setattr(training_args, 'align_vision_latent_loss_weight', args.align_vision_latent_loss_weight)
     setattr(training_args, 'latent_size', args.latent_size)
+    setattr(training_args, 'emphasize_latent_weight', args.emphasize_latent_weight)
 
 # Initialize the trainer (callbacks that need trainer instance will be added after)
 trainer = CustomTrainer(

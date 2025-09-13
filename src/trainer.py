@@ -1192,8 +1192,41 @@ class CustomTrainerAVT_V3(SFTTrainer):
             self.observation_token_acc_step += 1
         
         align_vision_latent_loss = student_outputs.loss_dict[f'align_vision_latent_{self.align_loss_type}']
-        loss = student_ce_loss + self.args.align_vision_latent_loss_weight * align_vision_latent_loss
+        original_loss = student_ce_loss + self.args.align_vision_latent_loss_weight * align_vision_latent_loss
         outputs_student_loss = student_ce_loss.item()
+
+        if self.args.emphasize_latent_weight != 1.0:
+            def _flatten_tensors(x):
+                # Flatten nested [list/tuple of Tensors] into a flat list of Tensors
+                if isinstance(x, (list, tuple)):
+                    out = []
+                    for y in x:
+                        out.extend(_flatten_tensors(y))
+                    return out
+                return [x]
+
+            ce_vec_list = _flatten_tensors(student_outputs_latent.ce_patch_vec)
+            grads = torch.autograd.grad(
+                outputs=original_loss,
+                inputs=ce_vec_list,
+                retain_graph=True,   # we won't reuse the 3rd graph
+                create_graph=False,   # stop higher-order graph
+                allow_unused=True     # in case some ce vectors are not used
+            )
+
+            # Replace None with zeros for unused elements
+            safe_grads = []
+            for v, g in zip(ce_vec_list, grads):
+                if g is None:
+                    # Create a zero tensor on the same device/dtype/shape
+                    g = torch.zeros_like(v)
+                safe_grads.append(g.detach())  # detach to stop any 3rd-forward param path
+
+            proxy_loss = torch.stack([(v * g).sum() for v, g in zip(ce_vec_list, safe_grads)]).sum()
+            loss = self.args.emphasize_latent_weight * proxy_loss + 1.0 * original_loss
+        else:
+            loss = original_loss
+
 
         # Periodic light GC on main process
         del student_outputs, teacher_outputs
@@ -1404,7 +1437,6 @@ class CustomTrainerAVT_V3_1(SFTTrainer):
 
         # Call parent to keep default behavior (console/TB/W&B/etc.)
         return super().log(merged, start_time)
-
 
 
 import weakref

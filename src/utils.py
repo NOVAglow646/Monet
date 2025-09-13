@@ -51,7 +51,7 @@ def get_args():
     parser.add_argument("--alignment_layer", choices=["all_layers", "last_layer"])
 
     # ===== AVT v3 =====
-    
+    parser.add_argument("--emphasize_latent_weight", default=1.0, type=float, help="Weight of the loss that only flow through latents in avt_v3.")
 
     # ===== Training record arguments =====
     parser.add_argument("--log_file", type=str, default='./log.txt')

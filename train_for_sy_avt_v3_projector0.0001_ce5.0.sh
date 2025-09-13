@@ -5,7 +5,7 @@ export NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9
 
 LATENT_SIZE=24
 CE_EMPHASIZE_FACTOR=5.0
-ALIGN_VISION_LATENT_LOSS_WEIGHT=0.00001
+ALIGN_VISION_LATENT_LOSS_WEIGHT=0.0001
 LOAD_CKPT=9.10_ablation_avt_v3.1_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-proj-wt${ALIGN_VISION_LATENT_LOSS_WEIGHT}/checkpoint-600
 SAVE_CKPT=9.12_ablation_avt_v3_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-wt${ALIGN_VISION_LATENT_LOSS_WEIGHT}
 source /pfs/wangzihao11/miniconda3/bin/activate

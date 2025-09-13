@@ -5,9 +5,9 @@ export NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9
 
 LATENT_SIZE=24
 CE_EMPHASIZE_FACTOR=5.0
-ALIGN_VISION_LATENT_LOSS_WEIGHT=0.00001
-LOAD_CKPT=9.10_ablation_avt_v3.1_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-proj-wt${ALIGN_VISION_LATENT_LOSS_WEIGHT}/checkpoint-600
-SAVE_CKPT=9.12_ablation_avt_v3_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-wt${ALIGN_VISION_LATENT_LOSS_WEIGHT}
+ALIGN_VISION_LATENT_LOSS_WEIGHT=0.0001
+LOAD_CKPT=9.10_ablation_avt_v3.1_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-proj-wt0.00001/checkpoint-900
+SAVE_CKPT=9.12_ablation_avt_v3_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-wt${ALIGN_VISION_LATENT_LOSS_WEIGHT}_pt900step_mask-latent
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
@@ -32,6 +32,7 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
   --wandb_name ${SAVE_CKPT} \
   --latent_size ${LATENT_SIZE} \
   --ce_emphasize_factor ${CE_EMPHASIZE_FACTOR} \
-  --align_vision_latent_loss_weight ${ALIGN_VISION_LATENT_LOSS_WEIGHT}
+  --align_vision_latent_loss_weight ${ALIGN_VISION_LATENT_LOSS_WEIGHT} \
+  --mask_latent
 
   
