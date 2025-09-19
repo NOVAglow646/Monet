@@ -648,11 +648,11 @@ def collate_fn_avt_v3(examples, alignment="boxed_start"):
     user_examples = remove_assistant_images(examples)
     user_image_inputs, _ = process_vision_info(user_examples)
     resize_ptr = 0
-    if new_sizes is not None:
-        for i, img in enumerate(user_image_inputs):
+    for i, img in enumerate(user_image_inputs):
+        if new_sizes[resize_ptr] is not None:
             img = img.resize(new_sizes[resize_ptr], Image.BICUBIC)
-            user_image_inputs[i] = img
-            resize_ptr += batch_assistant_img_cnts[i] + 1 # user_image_inputs only contain question images of each batch sample, so we need to skip the helper images in the new_sizes by adding batch_assistant_img_cnts[i]
+        user_image_inputs[i] = img
+        resize_ptr += batch_assistant_img_cnts[i] + 1 # user_image_inputs only contain question images of each batch sample, so we need to skip the helper images in the new_sizes by adding batch_assistant_img_cnts[i]
     student_batch = processor(text=student_texts, images=user_image_inputs, return_tensors="pt", padding=True)
     total_image_pads = 0
     for txt in student_texts:

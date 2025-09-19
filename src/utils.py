@@ -762,7 +762,7 @@ def resize_diff(images,
         divisor=divisor
     )
     processed.append(question_img_processed[0])
-    new_sizes.append(question_img_new_sizes[0])
+    new_sizes.append(question_img_new_sizes[0] if question_img_new_sizes is not None else None)
     remain_img_processed, remain_img_new_sizes = resize_by_token_budget(
         images[1:], 
         global_max_pixels=remain_global_max_pixels, 
@@ -770,7 +770,7 @@ def resize_diff(images,
         divisor=divisor
     )
     processed.extend(remain_img_processed)
-    new_sizes.extend(remain_img_new_sizes)
+    new_sizes.extend(remain_img_new_sizes if remain_img_new_sizes is not None else [None]*len(remain_img_processed))
     return processed, new_sizes
 
 if __name__=="__main__":
