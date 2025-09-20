@@ -14,7 +14,7 @@ conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
 export TOKENIZERS_PARALLELISM=false
 torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
-  --epochs 3 \
+  --epochs 5 \
   --bsz 1 \
   --grad_accum_steps 16 \
   --task "mm-reasoning" \
@@ -26,7 +26,7 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_geometry/filtered_train_w_metadata_9.1.json" \
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_maze/filtered_train_short3000_w_metadata_9.1.json" \
   --log_file "./log.txt" \
-  --load_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_v3/${LOAD_CKPT} \
+  --load_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_v3/${LOAD_CKPT}/checkpoint-900 \
   --save_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_v3/${SAVE_CKPT} \
   --dataset_root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \

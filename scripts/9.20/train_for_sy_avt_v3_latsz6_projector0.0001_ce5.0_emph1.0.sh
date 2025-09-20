@@ -7,7 +7,7 @@ LATENT_SIZE=6
 CE_EMPHASIZE_FACTOR=5.0
 ALIGN_VISION_LATENT_LOSS_WEIGHT=0.0001
 EMPHASIZE_LATENT_WEIGHT=1.0
-SAVE_CKPT=9.18_ablation_avt_v3_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-wt${ALIGN_VISION_LATENT_LOSS_WEIGHT}_emph-wt${EMPHASIZE_LATENT_WEIGHT}
+SAVE_CKPT=9.20_avt_v3_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-wt${ALIGN_VISION_LATENT_LOSS_WEIGHT}_emph-wt${EMPHASIZE_LATENT_WEIGHT}
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
