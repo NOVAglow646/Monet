@@ -268,6 +268,14 @@ def affine_subspace_alignment_loss(
     else:
         return loss_stack.mean()
 
+def alignment_loss(teacher_hidden_states: torch.Tensor, student_hidden_states: Union[List[torch.Tensor], torch.Tensor]):
+    total_loss = 0
+    if teacher_hidden_states.dim() == 3: # [num_layer, num_align_in_a_seg, dim], align all layers
+        total_loss = (1 - torch.nn.functional.cosine_similarity(teacher_hidden_states.to(student_hidden_states.device), student_hidden_states)).mean()
+    elif teacher_hidden_states.dim() == 1: # align last layer
+        total_loss = 1 - torch.nn.functional.cosine_similarity(student_hidden_states, teacher_hidden_states, 0)
+    return total_loss
+
 @torch.no_grad()
 def _svd_select_U(
     X: torch.Tensor,
@@ -1915,15 +1923,6 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
             ce_patch_vec = [[] for _ in range(batch_size)]   # List[List[Tensor(H,)]]
             hidden_states_to_return = [[] for _ in range(batch_size)]
             total_align_loss = None
-
-            def alignment_loss(teacher_hidden_states: torch.Tensor, student_hidden_states: Union[List[torch.Tensor], torch.Tensor]):
-                total_loss = 0
-                if teacher_hidden_states.dim() == 2: # align all layers
-                    student_hidden_states = torch.cat(student_hidden_states, dim=0).squeeze(1) # [num_layer, 1, dim]
-                    total_loss = (1 - torch.nn.functional.cosine_similarity(teacher_hidden_states.to(student_hidden_states.device), student_hidden_states)).mean()
-                elif teacher_hidden_states.dim() == 1: # align last layer
-                    total_loss = 1 - torch.nn.functional.cosine_similarity(student_hidden_states, teacher_hidden_states, 0)
-                return total_loss
             
             def detach_past_kv(pkv):
                 """
@@ -2044,6 +2043,12 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                     last_latent_pos_before_alignment.append(last_latent_pos)'''
                 
                 if teacher_hidden_states_for_alignment is not None:
+                    if teacher_hidden_states_for_alignment[b].shape[1] == 3068:
+                        print("### debug ###")
+                        print(inputs_embeds.shape)
+                        print(teacher_hidden_states_for_alignment[b].shape)
+                        print(align_pos)
+                        
                     assert teacher_hidden_states_for_alignment[b].shape[1] == len(align_pos), f"teacher_hidden_states_for_alignment.shape[1] ({teacher_hidden_states_for_alignment[b].shape[1]}) != len(align_pos) ({len(align_pos)})"
 
                 seq_embeds   = inputs_embeds[b : b + 1]         # (1,L,H)
@@ -2118,7 +2123,7 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                                     seg_pos_ids=seg_pos_ids,
                                     seg_att_m=seg_att_m,
                                     past_kv=past_kv,
-                                    need_hidden=False, #(teacher_hidden_states_for_alignment is not None and teacher_hidden_states_for_alignment[0].dim()==3), # if teacher_hidden_states_for_alignment is list, align reps of all layers; if teacher_hidden_states_for_alignment is tensor, only align last hidden state
+                                    need_hidden=(teacher_hidden_states_for_alignment is not None and teacher_hidden_states_for_alignment[0].dim()==3), # if teacher_hidden_states_for_alignment is list, align reps of all layers; if teacher_hidden_states_for_alignment is tensor, only align last hidden state
                                     no_grad_mode=False,
                                     **kwargs,
                                 )
@@ -2128,29 +2133,27 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                             #print(f"Forward {cut-s} text tokens, grad enabled, modified attention")
                             out = _run_text_chunk(s, cut, cut, past_kv)
 
-                            # comment below. since we only align latent tokens, which are not in text segments
-                            '''if teacher_hidden_states_for_alignment is not None and isinstance(teacher_hidden_states_for_alignment[0], list): # align all layers
+                            
+                            if teacher_hidden_states_for_alignment is not None: # align all layers
                                 num_layers = len(out.hidden_states)
-                                if hidden_states_layers is None:
-                                    hidden_states_layers = [[[] for _ in range(batch_size)] for _ in range(num_layers)]
+                                hidden_states_layers_b = [[] for _ in range(num_layers)]
                                 teacher_align_poss = []
                                 while align_ptr < len(align_pos) and align_pos[align_ptr] < cut:
                                     p = align_pos[align_ptr]
                                     offset = p - s
                                     for l in range(num_layers):
                                         vec = out.hidden_states[l][0, offset, :].flatten()
-                                        hidden_states_layers[l][b].append(vec)
+                                        hidden_states_layers_b[l].append(vec)
                                     teacher_align_poss.append(align_ptr)
                                     align_ptr += 1
                                 if len(teacher_align_poss) > 0:
+                                    student_hidden_states = [torch.stack(hid, dim=0) for hid in hidden_states_layers_b]
+                                    student_hidden_states = torch.stack(student_hidden_states, dim=0) # [num_layer, num_align_in_a_seg, dim]
                                     l_b = alignment_loss(
-                                        teacher_hidden_states_for_alignment,
-                                        [torch.stack(hid, dim=0) if len(hid[b])>0 else torch.empty(0, device=device, dtype=dtype)
-                                        for hid in hidden_states_layers],
-                                        b,
-                                        teacher_align_poss
+                                        teacher_hidden_states_for_alignment[b][:, teacher_align_poss, :], # [num_layer, num_align_in_a_seg, dim]
+                                        student_hidden_states, # [num_layer, num_align_in_a_seg, dim]
                                     )
-                                    align_losses_this_b.append(l_b)'''
+                                    align_losses_this_b += l_b
 
                             batch_last_hidden_state[b, s:cut, :] = out.last_hidden_state[0]
                             past_kv = out.past_key_values #detach_past_kv(out.past_key_values)
@@ -2294,6 +2297,9 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                     # 写入到对应位置
                     inputs_embeds[b, torch.tensor(pos_list, device=inputs_embeds.device, dtype=torch.long), :] = vecs
 
+            if "alignment" in kwargs.get('loss_type', {}):
+                output_hidden_states = True
+
             outputs = self.language_model(
                 input_ids=None,
                 position_ids=position_ids,
@@ -2308,10 +2314,40 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                 **kwargs,
             )
 
+            
+            if output_hidden_states:
+                num_layers = len(outputs.hidden_states)
+                hidden_states_to_return = [] # will return a list, each element is a sample in the batch with shape [num_layers, num_align or seq_len, dim]
+                for b in range(batch_size):
+                    hidden_states_b_tensor = []
+                    for l in range(num_layers):
+                        if alignment_poss[0]:
+                            hidden_states_b_tensor.append(outputs.hidden_states[l][b, alignment_poss[b], :])
+                        else:
+                            hidden_states_b_tensor.append(outputs.hidden_states[l][b, :, :])
+                    hidden_states_b_tensor = torch.stack(hidden_states_b_tensor, dim=0) # [num_layers, num_align, dim]
+                    hidden_states_to_return.append(hidden_states_b_tensor)
+            
+
+            total_align_loss = None
+            if "alignment" in kwargs.get('loss_type', {}):
+                total_align_loss = 0.
+                all_student_hidden_states = torch.stack(outputs.hidden_states, dim=0) # [num_layer, batch_size, seq_len, dim]
+                for b in range(batch_size):
+                    student_hidden_states = all_student_hidden_states[:, b, alignment_poss[b], :] 
+                    total_align_loss += alignment_loss(
+                                            teacher_hidden_states_for_alignment[b], # [num_layer, num_align_in_a_seg, dim]
+                                            student_hidden_states, # [num_layer, num_align_in_a_seg, dim]
+                                        )
+                total_align_loss /= batch_size
+                output_hidden_states = False
+
+
             output = Qwen2_5_VLModelOutputWithPast(
+                alignment_loss=total_align_loss,
                 last_hidden_state=outputs.last_hidden_state,
                 past_key_values=outputs.past_key_values,
-                hidden_states=outputs.hidden_states if output_hidden_states else None,
+                hidden_states=hidden_states_to_return if output_hidden_states else None,
                 attentions=outputs.attentions,
                 rope_deltas=self.rope_deltas,
                 align_vision_latent_pre_result=align_vision_latent_pre_result
@@ -2508,6 +2544,9 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
             if output_helper_img_embeds: # avt_v3 collect
                 loss_type = [] # only collect the pre results, don't compute loss
 
+        if not latent_mode and 'alignment' in loss_type: # avt_v4 alignment loss
+            kwargs['loss_type'] = loss_type
+
         outputs = self.model(
             input_ids=input_ids,
             pixel_values=pixel_values,
@@ -2592,17 +2631,17 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
                         if not ce_emphasize_poss[b]:
                             continue
                         has_obs_cnt += 1
-                        preds = logits[b].argmax(dim=-1)[ce_emphasize_poss[b]][:-1]
-                        emphasize_labels = labels[b][ce_emphasize_poss[b]][1:]
+                        poss = torch.tensor(ce_emphasize_poss[b], device=labels.device, dtype=torch.long)
+                        preds = logits[b].argmax(dim=-1)[poss-1][:]
+                        emphasize_labels = labels[b][poss][:]
                         correct = (preds == emphasize_labels).float()
-                        emphasize_acc = correct.sum() / max(1, len(ce_emphasize_poss[b]))
+                        emphasize_acc = correct.sum() / max(1, poss.shape[0])
                         mean_emphasize_acc += emphasize_acc.item()
                     if mean_emphasize_acc>0:
                         mean_emphasize_acc /= has_obs_cnt
 
         if 'alignment' in loss_type:
-                loss = outputs.alignment_loss
-                loss_dict['alignment'] = loss
+            loss_dict['alignment'] = loss
 
             # Compute auxiliary emphasize_latent_attn loss using cached attention if requested
         if _need_emph:
@@ -2654,15 +2693,18 @@ class Qwen2_5_VLForConditionalGeneration(Qwen2_5_VLPreTrainedModel, GenerationMi
 
         hidden_states_to_return = None
         if output_hidden_states:
-            hidden_states_to_return = []
-            for hidden_state_b_list in outputs.hidden_states:
-                hidden_state_b_tensor = []
-                for hidden_state_all_layers_p_tuple in hidden_state_b_list:
-                    hidden_state_all_layers_p_tensor = torch.cat(hidden_state_all_layers_p_tuple, dim=0) # (num_layers, 1, hidden_dim)
-                    hidden_state_b_tensor.append(hidden_state_all_layers_p_tensor)
-                hidden_state_b_tensor = torch.cat(hidden_state_b_tensor, dim=1) # (num_layers, num_latents_b, hidden_dim)
-                hidden_states_to_return.append(hidden_state_b_tensor)
-
+            if isinstance(outputs.hidden_states[0], list): # return from latent_mode 
+                hidden_states_to_return = []
+                for hidden_state_b_list in outputs.hidden_states: 
+                    hidden_state_b_tensor = []
+                    for hidden_state_all_layers_p_tuple in hidden_state_b_list:
+                        hidden_state_all_layers_p_tensor = torch.cat(hidden_state_all_layers_p_tuple, dim=0) # (num_layers, 1, hidden_dim)
+                        hidden_state_b_tensor.append(hidden_state_all_layers_p_tensor)
+                    hidden_state_b_tensor = torch.cat(hidden_state_b_tensor, dim=1) # (num_layers, num_latents_b, hidden_dim)
+                    hidden_states_to_return.append(hidden_state_b_tensor)
+            elif isinstance(outputs.hidden_states[0], torch.Tensor): # return from non-latent_mode
+                hidden_states_to_return = outputs.hidden_states # List[Tensor], each (B, S, H), S is total seq len (alignment poss is not set) or num_align (alignment poss is set)
+                
         return Qwen2_5_VLCausalLMOutputWithPast(
                 loss=loss,
                 logits=logits,

@@ -16,7 +16,7 @@ def get_args():
     # ===== Basic arguments =====
     parser.add_argument("--load_model_path", type=str, default='./checkpoints/model_stage1')
     parser.add_argument("--data_path", type=str, default='PathToJsonlData', nargs='+')
-    parser.add_argument("--stage", type=str, default="avt_stage1", choices=['avt_sft', 'avt_stage1', 'avt_v2_stage1', 'avt_v2_precompute_latent', 'avt_v2_stage2', 'avt_v3', 'avt_v3_1'])
+    parser.add_argument("--stage", type=str, default="avt_stage1", choices=['avt_sft', 'avt_stage1', 'avt_v2_stage1', 'avt_v2_precompute_latent', 'avt_v2_stage2', 'avt_v3', 'avt_v3_1', 'avt_v4'])
     parser.add_argument("--task", type=str, default="vsp-spatial-reasoning", choices=["vsp-spatial-reasoning", "vsp-spatial-planning", "blink-jigsaw", "sat", "mm-reasoning"])
     parser.add_argument("--save_model_path", type=str, default='./checkpoints/',help="Path to save the model checkpoints.")
     parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
@@ -25,6 +25,7 @@ def get_args():
                         help="Path to DeepSpeed config JSON, e.g., ./deepspeed/ds_zero2_cpu_offload.json")
     parser.add_argument("--num_samples", default=-1, help="-1 means all data", type=int)
     parser.add_argument("--max_seq_len", type=int, default=4096, help="Maximum allowed sequence length after processing.")
+    parser.add_argument("--image_resize", type=str, choices=["global", "clear_question_img"], default="global")
     # ===== Basic training hyperparameters =====
     parser.add_argument("--lr", type=float, default=1e-5, help="Learning rate for training.")
     parser.add_argument("--bsz", type=int, default=1, help="Batch size for training.")
@@ -47,7 +48,7 @@ def get_args():
     parser.add_argument("--only_predict_obs", action='store_true', default=False)
 
     # ==== AVT v2 stage2 arguments =====
-    parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in avt_stage1.")
+    parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in avt_stage1.", type=float)
     parser.add_argument("--alignment_layer", choices=["all_layers", "last_layer"])
 
     # ===== AVT v3 =====
@@ -88,6 +89,7 @@ def get_args():
     # ===== Precomputed teacher latent loading =====
     parser.add_argument("--teacher_latent_dir", type=str, default=None,
                         help="Directory that stores precomputed teacher latents (files named latent_{sample_id:08d}.pt). If not set, defaults to {save_model_path or ./checkpoints}/teacher_latents.")
+    parser.add_argument("--teacher_reps_dir", type=str)
     parser.add_argument("--attn_analysis", action='store_true', default=False)
     parser.add_argument("--output_latent_embeds", action='store_true', default=False)
     parser.add_argument("--output_hidden_states", action='store_true', default=False)
@@ -650,8 +652,8 @@ def mask_image_output_tokens(
 
 
 def resize_by_token_budget(images,
-                           global_max_pixels=800*3*28*28,
-                           per_img_max_pixels=1280*28*28,
+                           global_max_pixels=3000*28*28,
+                           per_img_max_pixels=2000*28*28,
                            divisor=28):
     """等比缩放，保证一条样本内所有图像像素和 ≤ global_max_pixels"""
     # 1) 统计原总像素
@@ -751,7 +753,7 @@ def resize_by_token_budget_sample_wise(images_per_sample,
 def resize_diff(images, 
                 question_img_max_pixels=1500*28*28,#2000*28*28, 
                 remain_global_max_pixels=1600*28*28,#800*3*28*28,
-                remain_per_img_max_pixels=800*28*28#1280*28*28,
+                remain_per_img_max_pixels=800*28*28,#1280*28*28,
                 divisor=28):
     processed = []
     new_sizes = []

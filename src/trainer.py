@@ -258,21 +258,10 @@ class CustomTrainerSFT(SFTTrainer):
             or torch.distributed.get_rank() == 0
         )
 
-        # 日志文件路径
-        log_dir = self.args.logging_dir or "./logs"
-        os.makedirs(log_dir, exist_ok=True)
-        timestamp = datetime.datetime.now().isoformat(timespec="seconds")
-        self.loss_log_path = os.path.join(log_dir, f"loss_history/loss_history_w{self.weight}_{self.exp_name}_{timestamp}.csv")
-
-        # 如果文件不存在，就写表头
-        if self.is_main_process and not os.path.exists(self.loss_log_path):
-            with open(self.loss_log_path, "w", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    "global_step","epoch",
-                    "loss_teacher_ce"
-                ])
-
+        self.observation_token_acc = 0.
+        self.observation_token_acc_step = 0
+        self.teacher_ce_cum = 0.0        # cumulative student CE loss
+        self.teacher_ce_steps = 0
         
 
     def _current_ce_emphasize_factor(self) -> float:
@@ -305,28 +294,34 @@ class CustomTrainerSFT(SFTTrainer):
         inputs['latent_mode'] = False
         inputs['input_ids'] = inputs['teacher_input_ids']
         inputs['attention_mask'] = inputs['teacher_attention_mask']
-        inputs['pixel_values'] = inputs['user_assistant_pixel_values']
-        inputs['image_grid_thw'] = inputs['user_assistant_image_grid_thw']
+        inputs['pixel_values'] = inputs['teacher_pixel_values']
+        inputs['image_grid_thw'] = inputs['teacher_image_grid_thw']
         inputs['labels'] = inputs['teacher_labels']
         # Collect available position categories dynamically (supports non_observation_poss)
-        poss_dict = {}
+        '''poss_dict = {}
         for k in ['boxed_start_poss','observation_poss','non_observation_poss']:
             if k in inputs:
-                poss_dict[k] = inputs[k]
-        inputs['ce_emphasize_poss'] = inputs['observation_poss']
+                poss_dict[k] = inputs[k]'''
+        inputs['ce_emphasize_poss'] = inputs['teacher_observation_poss']
         # Dynamic warmup factor passed to model.forward
-        inputs['ce_emphasize_factor'] = self._current_ce_emphasize_factor()
+        inputs['ce_emphasize_factor'] = self.args.ce_emphasize_factor
         inputs['loss_type'] = ['ce']
+        inputs['compute_emphasize_acc'] = True
         (teacher_ce_loss, teacher_outputs) = super().compute_loss(
                 model, 
                 inputs,
                 return_outputs=True, num_items_in_batch=num_items_in_batch
             )
 
-        
+        self.teacher_ce_cum += teacher_ce_loss.item()
+        self.teacher_ce_steps += 1
+
+        if getattr(teacher_outputs, 'mean_emphasize_acc', None) is not None:
+            self.observation_token_acc += getattr(teacher_outputs, 'mean_emphasize_acc')
+            self.observation_token_acc_step += 1
 
         # Representation analysis update
-        if self.rep_analyzer is not None and 'sample_id' in inputs:
+        '''if self.rep_analyzer is not None and 'sample_id' in inputs:
             with torch.no_grad():
                 sample_ids = inputs['sample_id']  # assume shape (B,)
                 hidden_states = teacher_outputs.hidden_states  # list[L] each (B,S,H)
@@ -349,31 +344,32 @@ class CustomTrainerSFT(SFTTrainer):
                                 pos_dict=pos_dict,
                                 epoch=int(self.state.epoch if self.state.epoch is not None else 0),
                                 global_step=int(self.state.global_step)
-                            )
-
-        outputs_teacher_loss = teacher_ce_loss.item()
+                            )'''
 
         del teacher_outputs
         gc.collect()
         torch.cuda.empty_cache()
-        
-        # --------  写本地文件  --------
-        if self.is_main_process:
-            with open(self.loss_log_path, "a", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    self.state.global_step,
-                    self.state.epoch,
-                    outputs_teacher_loss
-                ])
-        # --------------------------------------------
-        
         
         return (teacher_ce_loss, None) if return_outputs else teacher_ce_loss
 
     def on_epoch_end(self):
         # 注意：HF Trainer 不会自动调用子类自定义的 on_epoch_end；实际汇总通过回调实现。
         return super().on_epoch_end()
+
+    def log(self, logs: dict, start_time: float | None = None):
+        # Merge our rolling averages into the standard logs once per logging call
+        merged = dict(logs)
+        if self.teacher_ce_steps > 0:
+            merged["student_ce_loss"] = round(self.teacher_ce_cum / max(1, self.teacher_ce_steps), 6)
+            self.teacher_ce_cum = 0.0
+            self.teacher_ce_steps = 0
+        if self.observation_token_acc_step > 0:
+            merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
+            self.observation_token_acc = 0.
+            self.observation_token_acc_step = 0
+
+        # Call parent to keep default behavior (console/TB/W&B/etc.)
+        return super().log(merged, start_time)
 
 class CustomTrainerAVT_V2_Stage1(SFTTrainer):
     def __init__(self, *args, **kwargs):
@@ -1267,7 +1263,6 @@ class CustomTrainerAVT_V3(SFTTrainer):
         # Call parent to keep default behavior (console/TB/W&B/etc.)
         return super().log(merged, start_time)
 
-
 class CustomTrainerAVT_V3_1(SFTTrainer):
     def __init__(self, *args, **kwargs): 
         self.exp_name =kwargs.pop('exp_name')
@@ -1437,6 +1432,182 @@ class CustomTrainerAVT_V3_1(SFTTrainer):
 
         # Call parent to keep default behavior (console/TB/W&B/etc.)
         return super().log(merged, start_time)
+
+class CustomTrainerAVT_V4(SFTTrainer):
+    def __init__(self, *args, **kwargs): 
+        self.exp_name =kwargs.pop('exp_name')
+        super().__init__(*args, **kwargs)
+        self.weight = self.args.alignment_weight
+        self.ce_emphasize_factor: float = float(getattr(self.args, 'ce_emphasize_factor', 1.0))
+        # Where to read precomputed teacher latents
+        base_save = getattr(self.args, 'output_dir', './checkpoints')
+        self.teacher_reps_dir = getattr(self.args, 'teacher_reps_dir', None)
+        # 仅 rank‑0 进程写文件，防止多卡重复
+        self.is_main_process = (
+            not torch.distributed.is_initialized()
+            or torch.distributed.get_rank() == 0
+        )
+        
+        self.observation_token_acc = 0.
+        self.observation_token_acc_step = 0
+        self.alignment_loss_cum = 0.
+        self.alignment_loss_steps = 0
+        self._stu_ce_cum = 0.0        # cumulative student CE loss
+        self._stu_ce_steps = 0
+
+
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        # Prepare teacher forward inputs (for latent extraction)
+        '''inputs['latent_mode'] = False
+        inputs['input_ids'] = inputs['teacher_input_ids']
+        inputs['attention_mask'] = inputs['teacher_attention_mask']
+        inputs['pixel_values'] = inputs['teacher_pixel_values']
+        inputs['image_grid_thw'] = inputs['teacher_image_grid_thw']
+        inputs['labels'] = None
+        inputs['alignment_poss'] = inputs['teacher_observation_poss']
+        model.gradient_checkpointing_disable()
+        inputs['latent_size'] = self.args.latent_size
+        inputs['loss_type'] = []
+        inputs['output_hidden_states'] = True
+        with torch.no_grad():
+            teacher_outputs = model(**inputs)'''
+        
+        # Try to load precomputed teacher latents
+        teacher_reps = None
+        batch_metadata = inputs['metadata']
+
+        latents_list = []
+        for metadata in batch_metadata:
+            dataset_name = metadata['dataset_name']
+            sample_id = metadata['sample_id']
+            metadata_info = f"{self.args.alignment_layer}_{dataset_name}_{sample_id}"
+            path = os.path.join(self.teacher_reps_dir, f"rep_{metadata_info}.pt")
+            if not os.path.isfile(path):
+                latents_list = []
+                raise RuntimeError(f"Missing teacher latent file: {path}")
+            data = torch.load(path, map_location='cpu')
+            latents_list.append(data['latent'])
+        if batch_metadata is not None and len(latents_list) == len(batch_metadata):
+            teacher_reps = latents_list
+
+        # Fallback to online teacher forward
+        if not teacher_reps:
+            raise NotImplementedError("Online teacher forward not implemented; precompute and save teacher latents first.")
+
+        # Student alignment forward
+        inputs['latent_mode'] = True
+        inputs['input_ids'] = inputs['student_input_ids']
+        inputs['attention_mask'] = inputs['student_attention_mask']
+        inputs['pixel_values'] = inputs['student_pixel_values']
+        inputs['image_grid_thw'] = inputs['student_image_grid_thw']
+        inputs['teacher_hidden_states_for_alignment'] = teacher_reps
+        inputs['alignment_poss'] = inputs['student_observation_poss']
+        if 'labels' in inputs:
+            inputs.pop('labels')
+        model.gradient_checkpointing_disable()
+        inputs['loss_type'] = []
+        student_outputs_latent = model(**inputs)
+        
+
+        # Student CE forward
+        inputs['latent_mode'] = False
+        inputs['labels'] = inputs['student_labels']
+        inputs['ce_patch_pos'] = student_outputs_latent.ce_patch_pos
+        inputs['ce_patch_vec'] = student_outputs_latent.ce_patch_vec
+        inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
+        inputs['ce_emphasize_poss'] = inputs['student_observation_poss']
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        inputs['loss_type'] = ['ce', 'alignment']
+
+        inputs['compute_emphasize_acc'] = True
+        if 'student_attention_mask_4d' in inputs:
+            inputs['attention_mask_4d'] = inputs.pop('student_attention_mask_4d')
+        (student_ce_loss, student_outputs) = super().compute_loss(
+            model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+        )
+        alignment_loss = student_outputs.loss_dict['alignment']
+
+        if getattr(student_outputs, 'mean_emphasize_acc', None) is not None:
+            self.observation_token_acc += getattr(student_outputs, 'mean_emphasize_acc')
+            self.observation_token_acc_step += 1
+        
+        original_loss = student_ce_loss + self.args.alignment_weight * alignment_loss
+        outputs_student_loss = student_ce_loss.item()
+
+        if self.args.emphasize_latent_weight != 1.0:
+            def _flatten_tensors(x):
+                # Flatten nested [list/tuple of Tensors] into a flat list of Tensors
+                if isinstance(x, (list, tuple)):
+                    out = []
+                    for y in x:
+                        out.extend(_flatten_tensors(y))
+                    return out
+                return [x]
+
+            ce_vec_list = _flatten_tensors(student_outputs_latent.ce_patch_vec)
+            grads = torch.autograd.grad(
+                outputs=alignment_loss,
+                inputs=ce_vec_list,
+                retain_graph=True,   # we won't reuse the 3rd graph
+                create_graph=False,   # stop higher-order graph
+                allow_unused=True     # in case some ce vectors are not used
+            )
+
+            # Replace None with zeros for unused elements
+            safe_grads = []
+            for v, g in zip(ce_vec_list, grads):
+                if g is None:
+                    # Create a zero tensor on the same device/dtype/shape
+                    g = torch.zeros_like(v)
+                safe_grads.append(g.detach())  # detach to stop any 3rd-forward param path
+
+            proxy_loss = torch.stack([(v * g).sum() for v, g in zip(ce_vec_list, safe_grads)]).sum()
+            loss = self.args.emphasize_latent_weight * proxy_loss + 1.0 * original_loss
+        else:
+            loss = original_loss
+
+
+        # Periodic light GC on main process
+        del student_outputs
+        step = int(getattr(self.state, 'global_step', 0) or 0)
+        if self.is_main_process and step > 0 and (step % 20 == 0):
+            try:
+                gc.collect()
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+        # Logging
+        self._stu_ce_cum += outputs_student_loss
+        self._stu_ce_steps += 1
+        self.alignment_loss_cum += alignment_loss.item()
+        self.alignment_loss_steps += 1
+
+        return (loss, None) if return_outputs else loss
+    
+
+
+    def log(self, logs: dict, start_time: float | None = None):
+        # Merge our rolling averages into the standard logs once per logging call
+        merged = dict(logs)
+        if self._stu_ce_steps > 0:
+            merged["student_ce_loss"] = round(self._stu_ce_cum / max(1, self._stu_ce_steps), 6)
+            self._stu_ce_cum = 0.0
+            self._stu_ce_steps = 0
+        if self.alignment_loss_steps > 0:
+            merged[f'alignment_loss'] = round(self.alignment_loss_cum / max(1, self.alignment_loss_steps), 8)
+            self.alignment_loss_cum = 0.0
+            self.alignment_loss_steps = 0
+        if self.observation_token_acc_step > 0:
+            merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
+            self.observation_token_acc = 0.
+            self.observation_token_acc_step = 0
+
+
+        # Call parent to keep default behavior (console/TB/W&B/etc.)
+        return super().log(merged, start_time)
+
 
 
 import weakref

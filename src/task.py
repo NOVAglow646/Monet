@@ -112,7 +112,7 @@ def avt_single_input_images_preprocess_function(sample, dataset_root=""):
     Preprocess function for AVT with single input images.
     """
     conversations = sample["data"]
-
+    seen_observation = False
     # Process image loading for all steps first
     for i, step in enumerate(conversations):
         new_step = step.copy()
@@ -142,6 +142,8 @@ def avt_single_input_images_preprocess_function(sample, dataset_root=""):
                 # Validate that any observation text must be preceded by an assistant image within the same step
                 if "<observation>" in content.get("text", "") and not seen_assistant_image:
                     content['text'] = content['text'].replace("<observation>", "").replace("</observation>", "")
+                if "<observation>" in content.get("text", ""):
+                    seen_observation = True
             elif content["type"] == "text" and step["role"] == "user":
                 content["text"] = content["text"].replace("\nPut your final answer within \\boxed{}.", "")
 
@@ -149,6 +151,9 @@ def avt_single_input_images_preprocess_function(sample, dataset_root=""):
         conversations[i] = new_step
     sample["data"] = conversations
     
+    if not seen_observation:
+        return None
+
     return sample
 
 def avt_single_input_images_preprocess_function_question_only(sample, dataset_root="", processor=None, max_seq_len=4096, cur_max=-1, id=0, rank=-1):

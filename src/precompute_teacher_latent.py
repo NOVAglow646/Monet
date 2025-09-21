@@ -113,21 +113,24 @@ try:
 except Exception:
     pass
 
-def collate_fn_avt_v2_stage2(examples, alignment="boxed_start"):
+def collate_fn_precompute_teacher_rep(examples, alignment="boxed_start"):
     batch = {}
     batch['metadata'] = [ex['metadata'] for ex in examples]
     examples = [ex['data'] for ex in examples]
-    batch_assistant_img_cnts = [sum(1 for step in examples[i][2]['content'] if step["type"] == "image") for i in range(len(examples))]
     texts = [processor.apply_chat_template(ex, tokenize=False) for ex in examples]
+
     # replace <abs_vis_token></abs_vis_token> with <|vision_start|><|image_pad|><|vision_end|> for each <|im_start|>assistant content
     texts = [place_output_image_avt(text) for text in texts]
-
+    
     ################################################
     # teacher
     ################################################
     image_inputs, _ = process_vision_info(examples)
-    image_inputs, new_sizes = resize_by_token_budget(image_inputs)
-    teacher_texts = add_abs_vis_token_after_helper_img(texts, args.latent_size, "<abs_vis_token_pad>")
+    if args.image_resize == "global":
+        image_inputs, new_sizes = resize_by_token_budget(image_inputs)
+    elif args.image_resize == "clear_question":
+        image_inputs, new_sizes = resize_diff(image_inputs) # resize_by_token_budget(image_inputs)
+    teacher_texts = texts
     teacher_batch = processor(text=teacher_texts, images=image_inputs, return_tensors="pt", padding=True)
     total_image_pads = 0
     for txt in texts:
@@ -137,48 +140,18 @@ def collate_fn_avt_v2_stage2(examples, alignment="boxed_start"):
     batch['teacher_image_grid_thw'] = teacher_batch['image_grid_thw']
     batch['teacher_input_ids'] = teacher_batch['input_ids']
     batch['teacher_attention_mask'] = teacher_batch['attention_mask']
-    
-    ################################################
-    # student
-    ################################################
-    # replace <|vision_start|><|image_pad|><|vision_end|> with <abs_vis_token><abs_vis_token_pad>...</abs_vis_token> for each <|im_start|>assistant content
-    student_texts = replace_visual_spectial_tokens_avt(texts, args.latent_size, "<abs_vis_token_pad>")
-    user_examples = remove_assistant_images(examples)
-    user_image_inputs, _ = process_vision_info(user_examples)
-    resize_ptr = 0
-    if new_sizes is not None:
-        for i, img in enumerate(user_image_inputs):
-            img = img.resize(new_sizes[resize_ptr], Image.BICUBIC)
-            user_image_inputs[i] = img
-            resize_ptr += batch_assistant_img_cnts[i] + 1 # user_image_inputs only contain question images of each batch sample, so we need to skip the helper images in the new_sizes by adding batch_assistant_img_cnts[i]
-    student_batch = processor(text=student_texts, images=user_image_inputs, return_tensors="pt", padding=True)
-    total_image_pads = 0
-    for txt in student_texts:
-        total_image_pads += txt.count("<|image_pad|>")
-    assert total_image_pads == len(user_image_inputs)
-    batch['student_pixel_values'] = student_batch['pixel_values']
-    batch['student_image_grid_thw'] = student_batch['image_grid_thw']
-    batch["student_input_ids"] = student_batch["input_ids"]
-    batch["student_attention_mask"] = student_batch["attention_mask"]
 
-    batch["student_alignment_poss"] = find_ids_poss(batch["student_input_ids"], answer_start_pattern, latent_pad_idx)
-    batch["teacher_alignment_poss"] = find_ids_poss(batch["teacher_input_ids"], answer_start_pattern, latent_pad_idx)
-
-    latent_start_poss = find_ids_poss(batch["student_input_ids"], answer_start_pattern, latent_start_idx)
-    latent_end_poss = find_ids_poss(batch["student_input_ids"], answer_start_pattern, latent_end_idx)
-    batch["ce_emphasize_poss"] = []
-    for start_poss, end_poss in zip(latent_start_poss, latent_end_poss):
+    observation_start_poss = find_ids_poss(batch["teacher_input_ids"], answer_start_pattern, observation_start_idx)
+    observation_end_poss = find_ids_poss(batch["teacher_input_ids"], answer_start_pattern, observation_end_idx)
+    batch["teacher_observation_poss"] = []
+    assert len(observation_start_poss) == len(observation_end_poss)
+    for start_poss, end_poss in zip(observation_start_poss, observation_end_poss):
         poss_of_a_sample = []
         if len(start_poss) > 0 and len(end_poss) > 0:
             assert len(start_poss) == len(end_poss), f"start_poss: {start_poss}, end_poss: {end_poss}"
-            poss_of_a_sample.extend(start_poss)
-            poss_of_a_sample.extend(end_poss)
-        batch["ce_emphasize_poss"].append(poss_of_a_sample)
-
-
-    # mask tokens of '<|im_start|>assistant', '<|endoftext|>', and '<abs_vis_token_pad>' 
-    batch["student_labels"] = generate_labels_after_multi_token_start(batch["student_input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, latent_pad_idx])
-
+            for start, end in zip(start_poss, end_poss):
+                poss_of_a_sample.extend(list(range(start, end)))
+        batch["teacher_observation_poss"].append(poss_of_a_sample)
 
     return batch
 
@@ -252,16 +225,15 @@ def main():
                 cur_ids = shard[i:i+bs]
                 try:
                     examples = [train_dataset[j] for j in cur_ids]
-                    batch = collate_fn_avt_v2_stage2(examples)
+                    batch = collate_fn_precompute_teacher_rep(examples)
                     inputs = {
-                        'stage': 'avt_v2_stage2',               # produce latent_embeds as trainer_v2_stage2 expects
-                        'latent_mode': True,
+                        'latent_mode': False,
                         'input_ids': batch['teacher_input_ids'].to(device),
                         'attention_mask': batch['teacher_attention_mask'].to(device),
                         'pixel_values': batch['teacher_pixel_values'].to(device),
                         'image_grid_thw': batch['teacher_image_grid_thw'].to(device),
                         'labels': None,
-                        'alignment_poss': batch['teacher_alignment_poss'],
+                        'alignment_poss': batch['teacher_observation_poss'],
                         'loss_type': [],
                     }
                     if args.output_latent_embeds:
@@ -285,7 +257,7 @@ def main():
                             metadata_info = f"last_layer_{dataset_name}_{sample_id}"
                         elif args.output_hidden_states:
                             metadata_info = f"all_layers_{dataset_name}_{sample_id}"
-                        save_path = os.path.join(out_dir, f"latent_{metadata_info}.pt")
+                        save_path = os.path.join(out_dir, f"rep_{metadata_info}.pt")
                         torch.save({'metadata_info': metadata_info, 'latent': teacher_reps[b].detach().cpu()}, save_path)
                 except Exception as e:
                     logging.exception(f"[rank {rank}] Failed at batch start={i}, ids={cur_ids}: {e}")
