@@ -5,7 +5,7 @@ export NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9
 
 
 CE_EMPHASIZE_FACTOR=5.0
-SAVE_CKPT=9.25_avt_sft_ce${CE_EMPHASIZE_FACTOR}
+SAVE_CKPT=9.25_avt_sft_wo_maze_cnt_ce${CE_EMPHASIZE_FACTOR}
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
