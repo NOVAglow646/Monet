@@ -10,20 +10,6 @@ from .utils import SFTRepAnalyzer
 import math
 from time import time
 
-import torch
-from contextlib import contextmanager
-
-@contextmanager
-def prefer_mem_efficient_sdpa():
-    old = torch.backends.cuda.sdp_kernel.is_flash_enabled()
-    old_m = torch.backends.cuda.sdp_kernel.is_math_enabled()
-    old_e = torch.backends.cuda.sdp_kernel.is_mem_efficient_enabled()
-    try:
-        torch.backends.cuda.sdp_kernel(enable_flash=False, enable_math=False, enable_mem_efficient=True)
-        yield
-    finally:
-        torch.backends.cuda.sdp_kernel(enable_flash=old, enable_math=old_m, enable_mem_efficient=old_e)
-
 
 def compute_latents_only_loss(latents, loss_for_latents):
     def _flatten_tensors(x):
