@@ -13,7 +13,7 @@ conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
 export TOKENIZERS_PARALLELISM=false
 torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
-  --epochs 5 \
+  --epochs 8 \
   --bsz 1 \
   --grad_accum_steps 8 \
   --task "mm-reasoning" \
