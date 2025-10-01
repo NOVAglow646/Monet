@@ -92,7 +92,7 @@ def get_args():
     # ===== Precomputed teacher latent loading =====
     parser.add_argument("--teacher_latent_dir", type=str, default=None,
                         help="Directory that stores precomputed teacher latents (files named latent_{sample_id:08d}.pt). If not set, defaults to {save_model_path or ./checkpoints}/teacher_latents.")
-    parser.add_argument("--teacher_reps_dir", type=str)
+    parser.add_argument("--teacher_reps_dir", type=str, default=None)
     parser.add_argument("--attn_analysis", action='store_true', default=False)
     parser.add_argument("--output_latent_embeds", action='store_true', default=False)
     parser.add_argument("--output_hidden_states", action='store_true', default=False)

@@ -21,6 +21,8 @@ python /mmu_vcg_ssd/shiyang06/Tool/huggingface.py --item /mmu_vcg_ssd/shiyang06/
 
 
 step=400
+src=/mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_v3/${ckpt_name}/checkpoint-${step}
+output=/mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_v3/${ckpt_name}-checkpoint-${step}.zip
 if [ -z "$src" ] || [ -z "$output" ] || [ -z "$include_subdir" ]; then
     echo "用法: $0 <source_folder> <output_zip> <include_subdir:True|False>"
     exit 1

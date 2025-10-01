@@ -225,7 +225,7 @@ python remove_too_long.py \
 conda activate mirage
 cd /home/dids/shiyang/codes/abstract-visual-token
 python remove_too_long.py \
-    --max_seq_len 2500 \
+    --max_seq_len 2750 \
     --bsz 128 \
     --load_model_path "/home/dids/shiyang/checkpoints/Qwen2.5-VL-7B-Instruct" \
     --data_path \

@@ -109,8 +109,8 @@ class CustomTrainerAVTStage1(SFTTrainer):
         
         self._al_loss_cum = 0.0       # cumulative alignment loss since last log
         self._al_steps = 0            # number of micro-steps accumulated
-        self._stu_ce_cum = 0.0        # cumulative student CE loss
-        self._stu_ce_steps = 0
+        self.student_ce_loss_cum = 0.0        # cumulative student CE loss
+        self.student_ce_loss_steps = 0
                 
     def alignment_loss(self, student_reps_all_layers, teacher_reps_all_layers):
         layerwise_sim_record = []
@@ -204,8 +204,8 @@ class CustomTrainerAVTStage1(SFTTrainer):
         al_val = float(alignment_loss.detach().item()) if torch.is_tensor(alignment_loss) else float(alignment_loss)
         self._al_loss_cum += al_val
         self._al_steps += 1
-        self._stu_ce_cum += float(student_ce_loss.detach().item())
-        self._stu_ce_steps += 1
+        self.student_ce_loss_cum += float(student_ce_loss.detach().item())
+        self.student_ce_loss_steps += 1
 
         # --------  local logging  --------
         if self.is_main_process:
@@ -228,14 +228,14 @@ class CustomTrainerAVTStage1(SFTTrainer):
         merged = dict(logs)
         if self._al_steps > 0:
             merged["alignment_loss"] = round(self._al_loss_cum / max(1, self._al_steps), 6)
-        if self._stu_ce_steps > 0:
-            merged["student_ce_loss"] = round(self._stu_ce_cum / max(1, self._stu_ce_steps), 6)
+        if self.student_ce_loss_steps > 0:
+            merged["student_ce_loss"] = round(self.student_ce_loss_cum / max(1, self.student_ce_loss_steps), 6)
 
         # Reset accumulators after logging so the next window starts fresh
         self._al_loss_cum = 0.0
         self._al_steps = 0
-        self._stu_ce_cum = 0.0
-        self._stu_ce_steps = 0
+        self.student_ce_loss_cum = 0.0
+        self.student_ce_loss_steps = 0
 
         # Call parent to keep default behavior (console/TB/W&B/etc.)
         return super().log(merged, start_time)
@@ -912,8 +912,8 @@ class CustomTrainerAVT_V2_Stage2(SFTTrainer):
         self.observation_token_acc_step = 0
         self._al_loss_cum = 0.0       # cumulative alignment loss since last log
         self._al_steps = 0            # number of micro-steps accumulated
-        self._stu_ce_cum = 0.0        # cumulative student CE loss
-        self._stu_ce_steps = 0
+        self.student_ce_loss_cum = 0.0        # cumulative student CE loss
+        self.student_ce_loss_steps = 0
 
 
 
@@ -998,8 +998,8 @@ class CustomTrainerAVT_V2_Stage2(SFTTrainer):
         # Logging
         self._al_loss_cum += float(alignment_loss.detach().item())
         self._al_steps += 1
-        self._stu_ce_cum += outputs_student_loss
-        self._stu_ce_steps += 1
+        self.student_ce_loss_cum += outputs_student_loss
+        self.student_ce_loss_steps += 1
 
         '''if self.is_main_process:
             with open(self.loss_log_path, "a", newline="") as f:
@@ -1020,10 +1020,10 @@ class CustomTrainerAVT_V2_Stage2(SFTTrainer):
             merged["alignment_loss"] = round(self._al_loss_cum / max(1, self._al_steps), 6)
             self._al_loss_cum = 0.0
             self._al_steps = 0
-        if self._stu_ce_steps > 0:
-            merged["student_ce_loss"] = round(self._stu_ce_cum / max(1, self._stu_ce_steps), 6)
-            self._stu_ce_cum = 0.0
-            self._stu_ce_steps = 0
+        if self.student_ce_loss_steps > 0:
+            merged["student_ce_loss"] = round(self.student_ce_loss_cum / max(1, self.student_ce_loss_steps), 6)
+            self.student_ce_loss_cum = 0.0
+            self.student_ce_loss_steps = 0
         if self.observation_token_acc_step > 0:
             merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
             self.observation_token_acc = 0.
@@ -1054,8 +1054,8 @@ class CustomTrainerAVT_V3(SFTTrainer):
         self.observation_token_acc_step = 0
         self.align_vision_latent_loss_cum = 0.
         self.align_vision_latent_loss_steps = 0
-        self._stu_ce_cum = 0.0        # cumulative student CE loss
-        self._stu_ce_steps = 0
+        self.student_ce_loss_cum = 0.0        # cumulative student CE loss
+        self.student_ce_loss_steps = 0
 
 
 
@@ -1135,8 +1135,8 @@ class CustomTrainerAVT_V3(SFTTrainer):
                 pass
 
         # Logging
-        self._stu_ce_cum += outputs_student_loss
-        self._stu_ce_steps += 1
+        self.student_ce_loss_cum += outputs_student_loss
+        self.student_ce_loss_steps += 1
         self.align_vision_latent_loss_cum += align_vision_latent_loss.item()
         self.align_vision_latent_loss_steps += 1
 
@@ -1151,10 +1151,10 @@ class CustomTrainerAVT_V3(SFTTrainer):
             merged[f'align_vision_latent_loss_{self.align_loss_type}'] = round(self.align_vision_latent_loss_cum / max(1, self.align_vision_latent_loss_steps), 8)
             self.align_vision_latent_loss_cum = 0.0
             self.align_vision_latent_loss_steps = 0
-        if self._stu_ce_steps > 0:
-            merged["student_ce_loss"] = round(self._stu_ce_cum / max(1, self._stu_ce_steps), 6)
-            self._stu_ce_cum = 0.0
-            self._stu_ce_steps = 0
+        if self.student_ce_loss_steps > 0:
+            merged["student_ce_loss"] = round(self.student_ce_loss_cum / max(1, self.student_ce_loss_steps), 6)
+            self.student_ce_loss_cum = 0.0
+            self.student_ce_loss_steps = 0
         if self.observation_token_acc_step > 0:
             merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
             self.observation_token_acc = 0.
@@ -1185,8 +1185,8 @@ class CustomTrainerAVT_V3_1(SFTTrainer):
         self.observation_token_acc_step = 0
         self.align_vision_latent_loss_cum = 0.
         self.align_vision_latent_loss_steps = 0
-        self._stu_ce_cum = 0.0        # cumulative student CE loss
-        self._stu_ce_steps = 0
+        self.student_ce_loss_cum = 0.0        # cumulative student CE loss
+        self.student_ce_loss_steps = 0
 
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
@@ -1295,8 +1295,8 @@ class CustomTrainerAVT_V3_1(SFTTrainer):
 
         # ---------- Logging (keep your original meters) ----------
         outputs_student_loss = student_ce_loss.item()
-        self._stu_ce_cum += outputs_student_loss
-        self._stu_ce_steps += 1
+        self.student_ce_loss_cum += outputs_student_loss
+        self.student_ce_loss_steps += 1
         self.align_vision_latent_loss_cum += align_vision_latent_loss.item()
         self.align_vision_latent_loss_steps += 1
 
@@ -1321,10 +1321,10 @@ class CustomTrainerAVT_V3_1(SFTTrainer):
             merged[f'align_vision_latent_loss_{self.align_loss_type}'] = round(self.align_vision_latent_loss_cum / max(1, self.align_vision_latent_loss_steps), 8)
             self.align_vision_latent_loss_cum = 0.0
             self.align_vision_latent_loss_steps = 0
-        if self._stu_ce_steps > 0:
-            merged["student_ce_loss"] = round(self._stu_ce_cum / max(1, self._stu_ce_steps), 6)
-            self._stu_ce_cum = 0.0
-            self._stu_ce_steps = 0
+        if self.student_ce_loss_steps > 0:
+            merged["student_ce_loss"] = round(self.student_ce_loss_cum / max(1, self.student_ce_loss_steps), 6)
+            self.student_ce_loss_cum = 0.0
+            self.student_ce_loss_steps = 0
         if self.observation_token_acc_step > 0:
             merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
             self.observation_token_acc = 0.
@@ -1353,48 +1353,52 @@ class CustomTrainerAVT_V4(SFTTrainer):
         self.observation_token_acc_step = 0
         self.alignment_loss_cum = 0.
         self.alignment_loss_steps = 0
-        self._stu_ce_cum = 0.0        # cumulative student CE loss
-        self._stu_ce_steps = 0
-
+        self.student_ce_loss_cum = 0.0        # cumulative student CE loss
+        self.student_ce_loss_steps = 0
+        self.teacher_ce_loss_cum = 0.0        # cumulative teacher CE loss
+        self.teacher_ce_loss_steps = 0
 
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         # Prepare teacher forward inputs (for latent extraction)
-        '''inputs['latent_mode'] = False
-        inputs['input_ids'] = inputs['teacher_input_ids']
-        inputs['attention_mask'] = inputs['teacher_attention_mask']
-        inputs['pixel_values'] = inputs['teacher_pixel_values']
-        inputs['image_grid_thw'] = inputs['teacher_image_grid_thw']
-        inputs['labels'] = None
-        inputs['alignment_poss'] = inputs['teacher_observation_poss']
-        model.gradient_checkpointing_disable()
-        inputs['latent_size'] = self.args.latent_size
-        inputs['loss_type'] = []
-        inputs['output_hidden_states'] = True
-        with torch.no_grad():
-            teacher_outputs = model(**inputs)'''
-        
-        # Try to load precomputed teacher latents
-        teacher_reps = None
-        batch_metadata = inputs['metadata']
+        if self.teacher_reps_dir is None:
+            inputs['latent_mode'] = False
+            inputs['input_ids'] = inputs['teacher_input_ids']
+            inputs['attention_mask'] = inputs['teacher_attention_mask']
+            inputs['pixel_values'] = inputs['teacher_pixel_values']
+            inputs['image_grid_thw'] = inputs['teacher_image_grid_thw']
+            inputs['labels'] = inputs['teacher_labels']
+            inputs['alignment_poss'] = inputs['teacher_observation_poss']
+            model.gradient_checkpointing_disable()
+            inputs['latent_size'] = self.args.latent_size
+            inputs['loss_type'] = ['ce']
+            inputs['output_hidden_states'] = True
+            inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
+            inputs['ce_emphasize_poss'] = inputs['teacher_observation_poss']
+            #with torch.no_grad():
+            teacher_outputs = model(**inputs)
+            teacher_reps = teacher_outputs.hidden_states
+            teacher_ce_loss = teacher_outputs.loss_dict.get('ce', None)
+        else:       
+            # Try to load precomputed teacher latents
+            teacher_reps = None
+            batch_metadata = inputs['metadata']
+            teacher_ce_loss = None
+            latents_list = []
+            for metadata in batch_metadata:
+                dataset_name = metadata['dataset_name']
+                sample_id = metadata['sample_id']
+                metadata_info = f"{self.args.alignment_layer}_{dataset_name}_{sample_id}"
+                path = os.path.join(self.teacher_reps_dir, f"rep_{metadata_info}.pt")
+                if not os.path.isfile(path):
+                    latents_list = []
+                    raise RuntimeError(f"Missing teacher latent file: {path}")
+                data = torch.load(path, map_location='cpu')
+                latents_list.append(data['latent'].detach())
+            if batch_metadata is not None and len(latents_list) == len(batch_metadata):
+                teacher_reps = latents_list
 
-        latents_list = []
-        for metadata in batch_metadata:
-            dataset_name = metadata['dataset_name']
-            sample_id = metadata['sample_id']
-            metadata_info = f"{self.args.alignment_layer}_{dataset_name}_{sample_id}"
-            path = os.path.join(self.teacher_reps_dir, f"rep_{metadata_info}.pt")
-            if not os.path.isfile(path):
-                latents_list = []
-                raise RuntimeError(f"Missing teacher latent file: {path}")
-            data = torch.load(path, map_location='cpu')
-            latents_list.append(data['latent'].detach())
-        if batch_metadata is not None and len(latents_list) == len(batch_metadata):
-            teacher_reps = latents_list
 
-        # Fallback to online teacher forward
-        if not teacher_reps:
-            raise NotImplementedError("Online teacher forward not implemented; precompute and save teacher latents first.")
 
         # Student alignment forward
         inputs['latent_mode'] = True
@@ -1404,6 +1408,7 @@ class CustomTrainerAVT_V4(SFTTrainer):
         inputs['image_grid_thw'] = inputs['student_image_grid_thw']
         inputs['teacher_hidden_states_for_alignment'] = teacher_reps
         inputs['alignment_poss'] = inputs['student_observation_poss']
+        inputs['output_hidden_states'] = False
         if 'labels' in inputs:
             inputs.pop('labels')
         model.gradient_checkpointing_disable()
@@ -1436,17 +1441,24 @@ class CustomTrainerAVT_V4(SFTTrainer):
             self.observation_token_acc_step += 1
 
         if not self.no_ce:
-            outputs_student_loss = student_ce_loss.item()
+            record_student_loss = student_ce_loss.item()
+            if teacher_ce_loss is not None:
+                record_teacher_loss = teacher_ce_loss.item()
+            else:
+                record_teacher_loss = 0.0
         else:
             student_ce_loss = 0.0
-            outputs_student_loss = 0.0
+            record_student_loss = 0.0
+            record_teacher_loss = 0.0
 
         if self.args.emphasize_latent_weight != 1.0:
             latent_only_loss = compute_latents_only_loss(student_outputs_latent.ce_patch_vec, self.alignment_weight *alignment_loss)
-            loss = self.args.emphasize_latent_weight * latent_only_loss + 1.0 * student_ce_loss
+            loss = self.args.emphasize_latent_weight * latent_only_loss + student_ce_loss
         else:
             loss = student_ce_loss + self.alignment_weight * alignment_loss
 
+        if teacher_ce_loss is not None:
+            loss += 1.0 * teacher_ce_loss
 
         # Periodic light GC on main process
         del student_outputs
@@ -1459,10 +1471,13 @@ class CustomTrainerAVT_V4(SFTTrainer):
                 pass
 
         # Logging
-        self._stu_ce_cum += outputs_student_loss
-        self._stu_ce_steps += 1
+        self.student_ce_loss_cum += record_student_loss
+        self.student_ce_loss_steps += 1
         self.alignment_loss_cum += alignment_loss.item()
         self.alignment_loss_steps += 1
+        if teacher_ce_loss is not None:
+            self.teacher_ce_loss_cum += record_teacher_loss
+            self.teacher_ce_loss_steps += 1
 
         return (loss, None) if return_outputs else loss
     
@@ -1471,11 +1486,15 @@ class CustomTrainerAVT_V4(SFTTrainer):
     def log(self, logs: dict, start_time: float | None = None):
         # Merge our rolling averages into the standard logs once per logging call
         merged = dict(logs)
-        if self._stu_ce_steps > 0:
-            merged["student_ce_loss"] = round(self._stu_ce_cum / max(1, self._stu_ce_steps), 6)
-            self._stu_ce_cum = 0.0
-            self._stu_ce_steps = 0
-        if self.alignment_loss_steps > 0:
+        if self.student_ce_loss_cum > 0:
+            merged["student_ce_loss"] = round(self.student_ce_loss_cum / max(1, self.student_ce_loss_steps), 6)
+            self.student_ce_loss_cum = 0.0
+            self.student_ce_loss_steps = 0
+        if self.teacher_ce_loss_cum > 0:
+            merged["teacher_ce_loss"] = round(self.teacher_ce_loss_cum / max(1, self.teacher_ce_loss_steps), 6)
+            self.teacher_ce_loss_cum = 0.0
+            self.teacher_ce_loss_steps = 0
+        if self.alignment_loss_cum > 0:
             merged[f'alignment_loss'] = round(self.alignment_loss_cum / max(1, self.alignment_loss_steps), 6)
             self.alignment_loss_cum = 0.0
             self.alignment_loss_steps = 0
