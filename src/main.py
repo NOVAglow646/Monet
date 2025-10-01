@@ -780,17 +780,18 @@ def collate_fn_avt_v4(examples, alignment="boxed_start"):
         )
         batch["student_attention_mask_4d"] = {"full_attention": attn_mask_4d }
 
-    observation_start_poss = find_ids_poss(batch["teacher_input_ids"], answer_start_pattern, observation_start_idx)
-    observation_end_poss = find_ids_poss(batch["teacher_input_ids"], answer_start_pattern, observation_end_idx)
-    batch["teacher_observation_poss"] = []
-    assert len(observation_start_poss) == len(observation_end_poss)
-    for start_poss, end_poss in zip(observation_start_poss, observation_end_poss):
-        poss_of_a_sample = []
-        if len(start_poss) > 0 and len(end_poss) > 0:
-            assert len(start_poss) == len(end_poss), f"start_poss: {start_poss}, end_poss: {end_poss}"
-            for start, end in zip(start_poss, end_poss):
-                poss_of_a_sample.extend(list(range(start, end)))
-        batch["teacher_observation_poss"].append(poss_of_a_sample)
+    if args.teacher_reps_dir is None:
+        observation_start_poss = find_ids_poss(batch["teacher_input_ids"], answer_start_pattern, observation_start_idx)
+        observation_end_poss = find_ids_poss(batch["teacher_input_ids"], answer_start_pattern, observation_end_idx)
+        batch["teacher_observation_poss"] = []
+        assert len(observation_start_poss) == len(observation_end_poss)
+        for start_poss, end_poss in zip(observation_start_poss, observation_end_poss):
+            poss_of_a_sample = []
+            if len(start_poss) > 0 and len(end_poss) > 0:
+                assert len(start_poss) == len(end_poss), f"start_poss: {start_poss}, end_poss: {end_poss}"
+                for start, end in zip(start_poss, end_poss):
+                    poss_of_a_sample.extend(list(range(start, end)))
+            batch["teacher_observation_poss"].append(poss_of_a_sample)
 
     observation_start_poss = find_ids_poss(batch["student_input_ids"], answer_start_pattern, observation_start_idx)
     observation_end_poss = find_ids_poss(batch["student_input_ids"], answer_start_pattern, observation_end_idx)
