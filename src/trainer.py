@@ -1367,18 +1367,19 @@ class CustomTrainerAVT_V4(SFTTrainer):
             inputs['attention_mask'] = inputs['teacher_attention_mask']
             inputs['pixel_values'] = inputs['teacher_pixel_values']
             inputs['image_grid_thw'] = inputs['teacher_image_grid_thw']
-            inputs['labels'] = inputs['teacher_labels']
+            inputs['labels'] = None #inputs['labels'] = inputs['teacher_labels']
             inputs['alignment_poss'] = inputs['teacher_observation_poss']
             model.gradient_checkpointing_disable()
             inputs['latent_size'] = self.args.latent_size
-            inputs['loss_type'] = ['ce']
+            #inputs['loss_type'] = ['ce']
             inputs['output_hidden_states'] = True
             inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
             inputs['ce_emphasize_poss'] = inputs['teacher_observation_poss']
-            #with torch.no_grad():
-            teacher_outputs = model(**inputs)
-            teacher_reps = teacher_outputs.hidden_states
-            teacher_ce_loss = teacher_outputs.loss_dict.get('ce', None)
+            with torch.no_grad():
+                teacher_outputs = model(**inputs)
+                teacher_reps = teacher_outputs.hidden_states
+            #teacher_ce_loss = teacher_outputs.loss_dict.get('ce', None)
+            teacher_ce_loss = None
         else:       
             # Try to load precomputed teacher latents
             teacher_reps = None

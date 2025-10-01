@@ -25,7 +25,7 @@ torchrun --nproc-per-node=4 --master-port=29501 -m src.main \
     "./new/created_dataset/filtered_data/ReFocus/filtered_train_w_metadata_9.1.json" \
     "./new/created_dataset/filtered_data/Zebra_CoT_visual_search/filtered_train_w_metadata_9.24_further_washed_max_seq_len3000.json" \
     "./new/created_dataset/filtered_data/Zebra_CoT_geometry/filtered_train_w_metadata_9.1.json" \
-    "./new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train_w_metadata_9.25_max_seq_len4096_max_seq_len3000_max_seq_len2750.json" \
+    "./new/created_dataset/filtered_data/Zebra_CoT_count/filtered_train_w_metadata_9.25_max_seq_len4096_max_seq_len3000.json" \
   --log_file "./log.txt" \
   --load_model_path /home/dids/shiyang/checkpoints/after9.28/9.27_avt_sft_full_ce2.0/9.27_avt_sft_full_ce2.0 \
   --save_model_path /home/dids/shiyang/checkpoints/avt_v4/${SAVE_CKPT} \
