@@ -9,10 +9,10 @@ TEACHER=10.1_avt_sft_wo_maze_ce2.0
 
 # avt v4 training
 LATENT_SIZE=10
-CE_EMPHASIZE_FACTOR=4.0
+CE_EMPHASIZE_FACTOR=2.0
 ALIGNMENT_WEIGHT=2.0
 EMPHASIZE_LATENT_WEIGHT=2.0
-SAVE_CKPT=10.2_avt_v4_offline_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-wt${ALIGNMENT_WEIGHT}_emph-wt${EMPHASIZE_LATENT_WEIGHT}
+SAVE_CKPT=10.2_avt_v4_offline_pt10ep_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_align-wt${ALIGNMENT_WEIGHT}_emph-wt${EMPHASIZE_LATENT_WEIGHT}
 source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token
@@ -29,7 +29,7 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_geometry/filtered_train_w_metadata_9.1.json" \
     "/ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Zebra_CoT_count/filtered_train_w_metadata_9.25_max_seq_len4096_max_seq_len3000_max_seq_len2500.json" \
   --log_file "./log.txt" \
-  --load_model_path /ytech_m2v5_hdd/workspace/kling_mm/Models/Qwen2.5-VL-7B-Instruct \
+  --load_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_sft/${TEACHER} \
   --save_model_path /mmu_vcg_ssd/shiyang06/Project/Latent_Think/checkpoint/avt_v4/${SAVE_CKPT} \
   --dataset_root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
