@@ -10,7 +10,7 @@ python -m dataset_utils.stage1 \
     --dataset-name Visual_CoT \
     --dataset_path /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual-CoT/viscot_363k_1.json \
     --dataset_images_root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual-CoT/cot_images_tar_split \
-    --out_root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/ \
+    --out-root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/ \
     --policy-model-path /ytech_m2v5_hdd/workspace/kling_mm/Models/Qwen2.5-VL-7B-Instruct \
     --devices 0,1,2,3,4,5,6,7 \
     --policy_mllm_tensor_parallel_size 1 \
@@ -30,7 +30,7 @@ python -m dataset_utils.stage2_infer \
     --max-samples 30
 
 python -m dataset_utils.stage2_judge \
-    --infer-file /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual_CoT/stage2_inferred_1.jsonl \
+    --infer-file /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual_CoT/stage2_strong_inferred_1.jsonl \
     --stage1 /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual_CoT/stage1_policy_out_1.jsonl \
     --out /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual_CoT/stage2_strong_judged_1.jsonl \
     --judge_mode data_spec api \

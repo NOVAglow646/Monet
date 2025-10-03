@@ -849,7 +849,7 @@ def parse_visual_cot_all(
 
     return {
         "qid": qid,
-        "question":question,
+        "question":add_boxed_instruction(question, allow_None=False, mode="normal"),
         "gt_choices": None,
         "gt_answer_text": gt_answer_text,
         "main_image": main_img,
@@ -1390,7 +1390,18 @@ def main():
     out_root.mkdir(parents=True, exist_ok=True)
     out_img_dir = out_root / "images"
     out_img_dir.mkdir(parents=True, exist_ok=True)
-    out_jsonl = out_root / "stage1_policy_out.jsonl"
+    # 根据 args.dataset_path 的结尾决定输出文件名：
+    # 若以 _<i>.json 结尾，则输出为 stage1_policy_out_<i>.jsonl；否则为 stage1_policy_out.jsonl
+    suffix_num = None
+    if args.dataset_path is not None:
+        m = re.search(r"_(\d+)\.json$", args.dataset_path)
+        if m:
+            suffix_num = m.group(1)
+    if suffix_num is not None:
+        out_jsonl = out_root / f"stage1_policy_out_{suffix_num}.jsonl"
+    else:
+        out_jsonl = out_root / "stage1_policy_out.jsonl"
+
 
     # 加载模型 processor/tokenizer
     print("[Load tokenizer/processor]", args.policy_model_path)
