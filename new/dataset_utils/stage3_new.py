@@ -17,6 +17,7 @@ Stage-3  |  Alignment of helper CoT
 from __future__ import annotations
 import argparse, json, os, re, gc
 from typing import Any, Dict, List, Tuple
+import time
 import concurrent.futures as cf
 
 from transformers import AutoTokenizer
@@ -119,15 +120,47 @@ def batch_align(
                         resps = fut.result()
                         outs.extend(r.strip() if isinstance(r, str) else "" for r in resps)
             else:
-                resps = get_api_response(api_model, sys_prompt, usr_prompts, temperature=api_temperature)
+                # 单批 API 调用也加入 3 次重试
+                resps = _api_call_with_retries(api_model, sys_prompt, usr_prompts, api_temperature)
                 outs.extend(r.strip() if isinstance(r, str) else "" for r in resps)
     return outs
 
 
 def _api_chunk_call_pack(args: Tuple[str, str, List[str], float]) -> List[str]:
-    """顶层函数，供进程池调用，避免局部函数无法被 pickle 的问题。"""
+    """顶层函数，供进程池调用，避免局部函数无法被 pickle 的问题；内部包含 3 次重试。"""
     api_model, sys_prompt, sub_prompts, api_temperature = args
-    return get_api_response(api_model, sys_prompt, sub_prompts, temperature=api_temperature)
+    return _api_call_with_retries(api_model, sys_prompt, sub_prompts, api_temperature)
+
+
+def _api_call_with_retries(
+    api_model: str,
+    sys_prompt: str,
+    user_prompts: List[str],
+    temperature: float,
+    max_retries: int = 3,
+    base_backoff_sec: float = 1.0,
+) -> List[str]:
+    """调用外部 API（DeepSeek / Gemini）带重试。
+
+    策略：最多重试 max_retries 次，指数退避 base_backoff_sec * 2**attempt。
+    若最后一次仍失败，则抛出异常（由上层捕获或终止）。
+    """
+    last_err: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            return get_api_response(api_model, sys_prompt, user_prompts, temperature=temperature)
+        except Exception as e:
+            last_err = e
+            if attempt == max_retries - 1:
+                break
+            # 简单指数退避 + 轻微抖动
+            delay = base_backoff_sec * (2 ** attempt)
+            try:
+                time.sleep(delay)
+            except Exception:
+                pass
+    # 走到这里说明多次失败，抛出最后一次异常
+    raise last_err if last_err else RuntimeError("Unknown API error with retries exhausted")
 
 # ---------- make_final_cot ----------
 def make_final_cot(s1_rec: Dict[str, Any], aligned_steps: List[str]):

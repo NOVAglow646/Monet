@@ -15,6 +15,7 @@ python -m dataset_utils.stage1 \
     --devices 0,1,2,3,4,5,6,7 \
     --policy_mllm_tensor_parallel_size 1 \
     --limit 30 \
+    --start-id 0 \
     --judge_mode data_spec api \
     --api_name gemini-2.5-pro \
     --api_max_workers 64
