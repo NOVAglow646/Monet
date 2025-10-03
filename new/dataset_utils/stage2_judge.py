@@ -9,7 +9,11 @@ import argparse, json
 from typing import Any, Dict, List, Tuple
 import os
 from AAA_vllm_toolkit.load_and_gen_vllm import vllm_llm_init, vllm_kill_model
-from AAA_vllm_toolkit.extract_and_check import quick_batch_judge, llm_batch_judge, llm_batch_extract, data_spec_batch_judge
+from AAA_vllm_toolkit.extract_and_check import llm_batch_extract
+try:
+    from .judge_pipeline import sequential_judge_predictions
+except Exception:
+    from judge_pipeline import sequential_judge_predictions
 
 
 # --------------------------------------------------------------------------- #
@@ -27,42 +31,59 @@ def load_stage1_map(path: str):
 def process(
     batch_pred: List[Dict[str, Any]],
     s1_map: Dict[Tuple[str, int], Dict[str, Any]],
-    judge_mode: str,
-    judge_llm,
+    judge_mode: List[str],
+    judge_llm,  # optional, only for extraction when use_llm_to_extract_answer
     use_llm_to_extract_answer: bool,
     writer,
+    *,
+    judge_llm_dir: str,
+    judge_llm_tp: int,
+    api_name: str | None,
+    api_max_workers: int,
+    api_temperature: float,
 ):
     """Return (total, leak_drop, no_correct_drop, kept)."""
-    flat_preds, flat_gt, flat_choices, flat_q, sid_map = [], [], [], [], []
+    flat_preds, flat_gt, flat_q, sid_map, flat_ds = [], [], [], [], []
     for sid, item in enumerate(batch_pred):
         key = (item["dataset_name"], item["orig_idx"])
         rec = s1_map[key]
         gt_text = rec.get("gt_answer_text")
-        choices = rec.get("gt_choices")
         q = rec["question"]
         for p in item["predictions"]:
             flat_preds.append(p)
             flat_gt.append(gt_text)
-            flat_choices.append(choices)
             flat_q.append(q)
             sid_map.append(sid)
+            flat_ds.append(item["dataset_name"])  # track dataset per prediction
+    # correctness flags via sequential pipeline (per dataset group)
+    flags = [False] * len(flat_preds)
+    # group indices by dataset
+    ds_to_idxs: Dict[str, List[int]] = {}
+    for i, ds in enumerate(flat_ds):
+        ds_to_idxs.setdefault(ds, []).append(i)
 
-    # correctness flags
-    if use_llm_to_extract_answer:
-        flat_gt = llm_batch_extract(flat_gt, judge_llm, flat_q, item["dataset_name"])
-
-    llm_judged = [0]*len(flat_preds)  
-    quick_judged = [0]*len(flat_preds)  
-    data_spec_judged = [0]*len(flat_preds)      
-
-    if "quick" in judge_mode:
-        quick_judged = quick_batch_judge(flat_preds, flat_gt, flat_choices)
-    if "llm" in judge_mode:    
-        llm_judged = llm_batch_judge(flat_preds, flat_gt, judge_llm, flat_q)
-    if "data_spec" in judge_mode:
-        data_spec_judged = data_spec_batch_judge(flat_preds, flat_gt, item["dataset_name"])
-    
-    flags = [llm or quick or data_spec for llm, quick, data_spec in zip(llm_judged, quick_judged, data_spec_judged)]
+    for ds_name, idxs in ds_to_idxs.items():
+        sub_preds = [flat_preds[i] for i in idxs]
+        sub_gts = [flat_gt[i] for i in idxs]
+        sub_qs = [flat_q[i] for i in idxs]
+        # optional LLM extraction of GTs (generic), if requested
+        if use_llm_to_extract_answer and judge_llm is not None:
+            sub_gts = llm_batch_extract(sub_gts, judge_llm, sub_qs, ds_name)
+        # sequential judge according to stage1 strategy
+        sub_flags = sequential_judge_predictions(
+            sub_preds,
+            sub_gts,
+            judge_mode=judge_mode,
+            dataset_name=ds_name,
+            judge_llm_dir=judge_llm_dir,
+            judge_llm_tensor_parallel_size=judge_llm_tp,
+            questions=sub_qs,
+            api_name=api_name,
+            api_max_workers=api_max_workers,
+            api_kwargs={"temperature": api_temperature} if api_temperature is not None else None,
+        )
+        for i_loc, flg in zip(idxs, sub_flags):
+            flags[i_loc] = bool(flg)
     
     per_sample_ok: List[List[bool]] = [[] for _ in batch_pred]
     for flg, sid in zip(flags, sid_map):
@@ -120,18 +141,23 @@ def main():
     ap.add_argument("--batch", type=int, default=8192)
     #ap.add_argument("--use_llm_to_judge", action="store_true", default=False)
     ap.add_argument("--devices", default="0,1,2,3")
-    ap.add_argument("--max_samples", type=int, default=1000000)
+    ap.add_argument("--max_samples", type=int, default=10000000)
     ap.add_argument("--use_llm_to_extract_answer", action="store_true", default=False)
-    ap.add_argument("--judge_mode", choices=["quick", "llm", "data_spec"], nargs='+', )
+    ap.add_argument("--judge_mode", choices=["quick", "llm", "data_spec", "api"], nargs='+')
+    # API judging options (optional)
+    ap.add_argument("--api_name", type=str, default=None, choices=["gemini-2.5-pro", "deepseek-chat"], help="External API judge model name")
+    ap.add_argument("--api_max_workers", type=int, default=32, help="Parallel workers for API judging")
+    ap.add_argument("--api_temperature", type=float, default=0.0, help="Temperature for API judge calls")
     args = ap.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
 
     s1_map = load_stage1_map(args.stage1)
 
     judge_llm = None
-    if "llm" in args.judge_mode:
+    need_llm_for_extraction_only = args.use_llm_to_extract_answer and "llm" not in args.judge_mode
+    if "llm" in args.judge_mode or need_llm_for_extraction_only:
         judge_llm, _ = vllm_llm_init(
-            args.judge_llm_dir, tp=args.judge_llm_tensor_parallel_size, gpu_memory_utilization=0.95,max_model_len=7400
+            args.judge_llm_dir, tp=args.judge_llm_tensor_parallel_size, gpu_memory_utilization=0.95, max_model_len=7400
         )
 
     writer = open(args.out, "w", encoding="utf-8")
@@ -142,7 +168,19 @@ def main():
         for ln in f:
             buf.append(json.loads(ln))
             if len(buf) >= args.batch or len(buf) >= args.max_samples:
-                t, l, n, k = process(buf, s1_map, args.judge_mode, judge_llm, args.use_llm_to_extract_answer, writer)
+                t, l, n, k = process(
+                    buf,
+                    s1_map,
+                    args.judge_mode,
+                    judge_llm,
+                    args.use_llm_to_extract_answer,
+                    writer,
+                    judge_llm_dir=args.judge_llm_dir,
+                    judge_llm_tp=args.judge_llm_tensor_parallel_size,
+                    api_name=args.api_name,
+                    api_max_workers=args.api_max_workers,
+                    api_temperature=args.api_temperature,
+                )
                 total_in += t
                 leak_drop += l
                 no_correct_drop += n
@@ -151,7 +189,19 @@ def main():
                     break
                 buf.clear()
         if buf:
-            t, l, n, k = process(buf, s1_map, args.judge_mode, judge_llm, args.use_llm_to_extract_answer, writer)
+            t, l, n, k = process(
+                buf,
+                s1_map,
+                args.judge_mode,
+                judge_llm,
+                args.use_llm_to_extract_answer,
+                writer,
+                judge_llm_dir=args.judge_llm_dir,
+                judge_llm_tp=args.judge_llm_tensor_parallel_size,
+                api_name=args.api_name,
+                api_max_workers=args.api_max_workers,
+                api_temperature=args.api_temperature,
+            )
             total_in += t
             leak_drop += l
             no_correct_drop += n

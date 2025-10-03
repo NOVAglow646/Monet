@@ -17,6 +17,7 @@ Stage-3  |  Alignment of helper CoT
 from __future__ import annotations
 import argparse, json, os, re, gc
 from typing import Any, Dict, List, Tuple
+import concurrent.futures as cf
 
 from transformers import AutoTokenizer
 from AAA_vllm_toolkit.load_and_gen_vllm import (
@@ -76,6 +77,9 @@ def batch_align(
     tokenizer,
     batch_size: int,
     api_model: str | None,
+    *,
+    api_max_workers: int = 32,
+    api_temperature: float = 0.3,
 ):
     outs: List[str] = []
     sys_prompt, _ = _prompts(["dummy"], dataset_name)  # sys_part 共用
@@ -89,9 +93,41 @@ def batch_align(
             gen = vllm_generate(inputs, sampling_params, llm)
             outs.extend(g.outputs[0].text.strip() if g.outputs else "" for g in gen)
         else:
-            resps = get_api_response(api_model, sys_prompt, usr_prompts, temperature=0.3)
-            outs.extend(r.strip() for r in resps)
+            # 并行 API：将当前 chunk 的 prompts 分块并发
+            if api_max_workers and api_max_workers > 1 and len(usr_prompts) > 1:
+                # 均匀切分到 workers 数量（不超过样本数）
+                workers = min(api_max_workers, len(usr_prompts))
+                # 生成切片边界
+                sizes = [(len(usr_prompts) + j) // workers for j in range(workers)]
+                total = sum(sizes)
+                if total != len(usr_prompts):
+                    sizes[0] += (len(usr_prompts) - total)
+                slices = []
+                s = 0
+                for sz in sizes:
+                    slices.append(usr_prompts[s : s + sz])
+                    s += sz
+
+                with cf.ProcessPoolExecutor(max_workers=workers) as ex:
+                    # 用顶层函数以避免 pickling 问题
+                    futs = [
+                        ex.submit(_api_chunk_call_pack, (api_model, sys_prompt, sub, api_temperature))
+                        for sub in slices if sub
+                    ]
+                    # 保序收集：按切片顺序扩展
+                    for fut in futs:
+                        resps = fut.result()
+                        outs.extend(r.strip() if isinstance(r, str) else "" for r in resps)
+            else:
+                resps = get_api_response(api_model, sys_prompt, usr_prompts, temperature=api_temperature)
+                outs.extend(r.strip() if isinstance(r, str) else "" for r in resps)
     return outs
+
+
+def _api_chunk_call_pack(args: Tuple[str, str, List[str], float]) -> List[str]:
+    """顶层函数，供进程池调用，避免局部函数无法被 pickle 的问题。"""
+    api_model, sys_prompt, sub_prompts, api_temperature = args
+    return get_api_response(api_model, sys_prompt, sub_prompts, temperature=api_temperature)
 
 # ---------- make_final_cot ----------
 def make_final_cot(s1_rec: Dict[str, Any], aligned_steps: List[str]):
@@ -139,9 +175,11 @@ def main():
     pa.add_argument("--judge_llm_tensor_parallel_size", type=int, default=4)
     pa.add_argument("--devices", default="0,1,2,3")
     pa.add_argument("--out-json", required=True)
-    pa.add_argument("--max-records", type=int)
+    pa.add_argument("--max-records", type=int, default=None)
     pa.add_argument("--align-batch", type=int, default=4096)
     pa.add_argument("--api_model_name", choices=["gemini-2.5-pro", "deepseek-chat"])
+    pa.add_argument("--api_max_workers", type=int, default=32)
+    pa.add_argument("--api_temperature", type=float, default=0.3)
     args = pa.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
@@ -194,6 +232,8 @@ def main():
         tok,
         args.align_batch,
         api_model,
+        api_max_workers=args.api_max_workers,
+        api_temperature=args.api_temperature,
     )
     assert len(aligned) == len(s1_samples)
 

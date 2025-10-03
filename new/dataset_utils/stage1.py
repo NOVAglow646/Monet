@@ -67,8 +67,13 @@ from AAA_vllm_toolkit.extract_and_check import (
     llm_batch_extract,
     data_spec_batch_judge
 )
+try:
+    from .judge_pipeline import sequential_judge_predictions
+except Exception:  # when executed as a script without package context
+    from judge_pipeline import sequential_judge_predictions
 
 from transformers import AutoProcessor, AutoTokenizer  # trust_remote_code needed
+import multiprocessing as mp
 
 # =============================
 # 数据集路径映射 (按用户环境)
@@ -103,8 +108,12 @@ DEFAULT_DATASETS = {
         "dataset_images_root": "/home/dids/shiyang/datasets/Visual-CoT",
     },
     "Visual_CoT_gqa": {
-        "dataset_path": "/home/dids/shiyang/datasets/Visual-CoT/metadata/gqa_cot_train.jsonl",
-        "dataset_images_root": "/home/dids/shiyang/datasets/Visual-CoT",
+        "dataset_path": "/home/dids/shiyang/datasets/Visual-CoT/viscot_363k.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/Visual-CoT/cot_images_tar_split",
+    },
+    "Visual_CoT": {
+        "dataset_path": "/home/dids/shiyang/datasets/Visual-CoT/viscot_363k.json",
+        "dataset_images_root": "/home/dids/shiyang/datasets/Visual-CoT/cot_images_tar_split",
     },
     "VTS": {
         "dataset_path": "/home/dids/shiyang/datasets/VTS/vts_train.jsonl",
@@ -779,6 +788,74 @@ def parse_visual_cot_wo_choices(
         "helpers": helpers,
     }
 
+def parse_visual_cot_all(
+    sample: Dict[str, Any], dataset_images_root: Path, dataset_name: str, qid: int
+) -> Optional[Dict[str, Any]]:
+    def parse_bbox(bbox_str: str) -> Optional[Tuple[int, int, int, int]]:
+        start_pos = bbox_str.find("[")
+        end_pos = bbox_str.find("]")
+        if start_pos == -1 or end_pos == -1 or end_pos <= start_pos:
+            return None
+        bbox_values = bbox_str[start_pos + 1 : end_pos].split(",")
+        if len(bbox_values) != 4:
+            return None
+
+        bbox = tuple(int(value.strip()) for value in bbox_values)
+        if valid_bbox(bbox):
+            return bbox
+    qid = sample["question_id"]
+    conversations = sample["conversations"]
+    question = conversations[0]["value"].replace("Please provide the bounding box coordinate of the region that can help you answer the question better.", "").strip()
+    gt_answer_text = conversations[-1]["value"]
+    images = sample["image"]
+    main_img_path = (
+        dataset_images_root
+        / images[0]
+    )
+    img_ptr = 1
+    step_ptr = 1
+    if not os.path.exists(main_img_path):
+        return None
+    main_img = Image.open(main_img_path).convert("RGB")
+    
+    helpers = []
+    for i, conv in enumerate(conversations[1:]):
+        if "<image>" in conv["value"]:
+            bbox = parse_bbox(images[img_ptr])
+            if not valid_bbox(bbox):
+                return None
+            helper_img = main_img.crop(bbox)
+            helpers.append(
+                {
+                    "step_idx": step_ptr,
+                    "text": "<abs_vis_token></abs_vis_token>",
+                    "image": helper_img,
+                    "type": "crop",
+                }
+            )
+            step_ptr += 1
+        elif "[" in conv["value"] and "]" in conv["value"]:
+            continue
+        else:
+            helpers.append(
+                {
+                    "step_idx": step_ptr,
+                    "text": conv["value"],
+                    "image": None,
+                    "type": "text",
+                }
+            )
+            step_ptr += 1
+
+    return {
+        "qid": qid,
+        "question":question,
+        "gt_choices": None,
+        "gt_answer_text": gt_answer_text,
+        "main_image": main_img,
+        "helpers": helpers,
+    }
+
 
 def parse_zebra_cot(
     sample: Dict[str, Any], dataset_images_root: Path
@@ -979,7 +1056,7 @@ def save_images_for_sample(
     out_img_dir.mkdir(parents=True, exist_ok=True)
     paths = []
     # main
-    main_path = out_img_dir / f"{sid}_0_.jpg"
+    main_path = out_img_dir / f"{sid}_0.jpg"
     main_img.save(main_path)
     paths.append(str(main_path))
     # helpers
@@ -989,7 +1066,7 @@ def save_images_for_sample(
         if img is None:
             # paths.append(None)
             continue
-        p = out_img_dir / f"{sid}_{idx}_.jpg"
+        p = out_img_dir / f"{sid}_{idx}.jpg"
         img.save(p)
         paths.append(str(p))
         idx += 1
@@ -1001,6 +1078,99 @@ def save_images_for_sample(
 # ============================================================
 
 
+def _dp_worker_run(
+    device_ids: List[int],
+    conv_list: List[list],
+    max_model_len: Optional[int],
+    policy_model_path: str,
+    tp: int,
+    batch_size: int = 8192,
+) -> Tuple[List[Optional[str]], List[Optional[str]], List[bool]]:
+    """单个进程在指定 GPU 组上运行一个 vLLM 实例并完成一个分片的推理。"""
+    import os as _os
+    from transformers import AutoProcessor as _AutoProcessor, AutoTokenizer as _AutoTokenizer
+    from AAA_vllm_toolkit.load_and_gen_vllm import (
+        vllm_mllm_init as _vllm_mllm_init,
+        vllm_mllm_process_batch_from_messages as _proc_from_msgs,
+        count_qwen_vl_tokens as _count_tokens,
+        vllm_kill_model as _vllm_kill_model,
+    )
+    from AAA_vllm_toolkit.extract_and_check import extract_boxed_answer as _extract_boxed_answer
+
+    _os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in device_ids)
+    # 每个 worker 独立加载 tokenizer/processor 与模型
+    _tokenizer = _AutoTokenizer.from_pretrained(policy_model_path, trust_remote_code=True)
+    _processor = _AutoProcessor.from_pretrained(policy_model_path)
+    _policy_mllm, _sampling_params = _vllm_mllm_init(policy_model_path, tp=tp)
+    try:
+        raw_outs_all: List[Optional[str]] = []
+        extr_outs_all: List[Optional[str]] = []
+        keep_mask_all: List[bool] = []
+
+        for start in range(0, len(conv_list), batch_size):
+            sub_convs = conv_list[start : start + batch_size]
+            inputs = _proc_from_msgs(sub_convs, _processor)
+
+            keep_mask = [True] * len(inputs)
+            if max_model_len is not None and _count_tokens is not None:
+                tok_lens = _count_tokens(inputs, _tokenizer, _processor)
+                for i, L in enumerate(tok_lens):
+                    if L > max_model_len:
+                        keep_mask[i] = False
+
+            kept_inputs = [inp for inp, k in zip(inputs, keep_mask) if k]
+            if kept_inputs:
+                outputs = _policy_mllm.generate(kept_inputs, sampling_params=_sampling_params, use_tqdm=True)
+            else:
+                outputs = []
+
+            raw_outs, extr_outs = [], []
+            j = 0
+            for k in keep_mask:
+                if not k:
+                    raw_outs.append(None)
+                    extr_outs.append(None)
+                else:
+                    o = outputs[j]
+                    j += 1
+                    text = o.outputs[0].text.strip() if o.outputs else ""
+                    raw_outs.append(text)
+                    extr_outs.append(_extract_boxed_answer(text))
+
+            raw_outs_all.extend(raw_outs)
+            extr_outs_all.extend(extr_outs)
+            keep_mask_all.extend(keep_mask)
+
+        return raw_outs_all, extr_outs_all, keep_mask_all
+    finally:
+        try:
+            _vllm_kill_model(_policy_mllm)
+        except Exception:
+            pass
+
+
+def _dp_worker_entry(
+    queue,
+    device_ids: List[int],
+    conv_list: List[list],
+    max_model_len: Optional[int],
+    policy_model_path: str,
+    tp: int,
+    batch_size: int,
+    shard_idx: int,
+):
+    """进程入口：运行分片并将结果回传到队列。"""
+    try:
+        raw, extr, keep = _dp_worker_run(
+            device_ids, conv_list, max_model_len, policy_model_path, tp, batch_size
+        )
+        queue.put((shard_idx, raw, extr, keep))
+    except Exception:
+        import traceback as _tb
+        _tb.print_exc()
+        queue.put((shard_idx, [], [], []))
+
+
 def run_policy_batch(
     policy_mllm,
     conv_list: List[list],
@@ -1009,7 +1179,77 @@ def run_policy_batch(
     tokenizer,
     max_model_len: Optional[int],
     batch_size: int = 8192,
+    dp_device_groups: Optional[List[List[int]]] = None,
+    policy_model_path: Optional[str] = None,
+    tp: int = 1,
 ) -> Tuple[List[Optional[str]], List[Optional[str]], List[bool]]:
+    """支持两种模式：
+    - 单引擎批推理（原逻辑）
+    - 多进程多卡数据并行（dp_device_groups 不为空时）：每个进程独立引擎 + GPU 组
+    """
+
+    # DP 路径
+    if dp_device_groups and len(dp_device_groups) > 1:
+        if not policy_model_path:
+            raise ValueError("policy_model_path must be provided for data-parallel inference")
+        num_workers = len(dp_device_groups)
+        n = len(conv_list)
+        if n == 0:
+            return [], [], []
+
+        # contiguous split into num_workers shards
+        shard_sizes = [(n + i) // num_workers for i in range(num_workers)]
+        total_assigned = sum(shard_sizes)
+        if total_assigned != n:
+            shard_sizes[0] += (n - total_assigned)
+        shards = []
+        idx = 0
+        for sz in shard_sizes:
+            shards.append(conv_list[idx : idx + sz])
+            idx += sz
+
+        ctx = mp.get_context("spawn")
+        queue = ctx.Queue()
+        procs: List[mp.Process] = []
+        # 启动进程（非 daemon），每个进程独立引擎
+        for shard_idx, (devs, shard) in enumerate(zip(dp_device_groups, shards)):
+            if not shard:
+                # 直接放空结果
+                queue.put((shard_idx, [], [], []))
+                continue
+            p = ctx.Process(
+                target=_dp_worker_entry,
+                args=(queue, devs, shard, max_model_len, policy_model_path, tp, batch_size, shard_idx),
+            )
+            p.daemon = False
+            p.start()
+            procs.append(p)
+
+        # 收集结果
+        received = 0
+        outputs = [None] * num_workers  # type: ignore
+        while received < num_workers:
+            shard_idx, raw, extr, keep = queue.get()
+            outputs[shard_idx] = (raw, extr, keep)
+            received += 1
+
+        for p in procs:
+            p.join()
+
+        # 拼接
+        raw_all: List[Optional[str]] = []
+        extr_all: List[Optional[str]] = []
+        keep_all: List[bool] = []
+        for out in outputs:
+            if out is None:
+                continue
+            raw, extr, keep = out
+            raw_all.extend(raw)
+            extr_all.extend(extr)
+            keep_all.extend(keep)
+        return raw_all, extr_all, keep_all
+
+    # 单引擎路径（原逻辑）
 
     if vllm_mllm_process_batch_from_messages is None:
         raise RuntimeError(
@@ -1123,7 +1363,13 @@ def main():
         default=2,
         help="policy_mllm 模型的 tensor parallel size",
     )
-    parser.add_argument("--judge_mode", choices=["llm", "quick", "data_spec"], nargs="+")
+    parser.add_argument("--judge_mode", choices=["llm", "quick", "data_spec", "api"], nargs="+")
+    # API judging related
+    parser.add_argument("--api_name", type=str, default=None, choices=["gemini-2.5-pro", "deepseek-chat"], help="External API judge model name")
+    parser.add_argument("--api_max_workers", type=int, default=32, help="Parallel workers for API judging")
+    parser.add_argument("--api_temperature", type=float, default=0.0, help="Temperature for API judge calls")
+    parser.add_argument("--dataset_path", type=str, default=None, help="Path for dataset, if not set, use the default from DEFAULT_DATASETS")
+    parser.add_argument("--dataset_images_root", type=str, default=None, help="Root path for dataset images, if not set, use the default from DEFAULT_DATASETS")
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
@@ -1133,6 +1379,11 @@ def main():
     ds_cfg = DEFAULT_DATASETS[args.dataset_name]
     dataset_path = Path(ds_cfg["dataset_path"])
     dataset_images_root = Path(ds_cfg["dataset_images_root"])
+    if args.dataset_path is not None:
+        dataset_path = Path(args.dataset_path)
+    if args.dataset_images_root is not None:
+        dataset_images_root = Path(args.dataset_images_root)
+
 
     # 输出路径
     out_root = Path(args.out_root) / args.dataset_name
@@ -1149,10 +1400,18 @@ def main():
     processor = AutoProcessor.from_pretrained(args.policy_model_path)
 
     # 加载 policy 模型
-    print("[Init policy_mllm]")
-    policy_mllm, sampling_params = vllm_mllm_init(
-        args.policy_model_path, tp=args.policy_mllm_tensor_parallel_size
-    )
+    # 设备划分：根据 devices 与 tp 自动计算数据并行分组
+    devices_list = [int(x) for x in args.devices.split(",") if x.strip() != ""]
+    tp = args.policy_mllm_tensor_parallel_size
+    dp_degree = len(devices_list) // tp if tp > 0 else 0
+    use_dp = dp_degree > 1
+    dp_groups = [devices_list[i * tp : (i + 1) * tp] for i in range(dp_degree)] if use_dp else []
+
+    if not use_dp:
+        print("[Init policy_mllm]")
+        policy_mllm, sampling_params = vllm_mllm_init(
+            args.policy_model_path, tp=args.policy_mllm_tensor_parallel_size
+        )
 
     # ------------------ 加载原始数据 ------------------
     print(f"[Load dataset] {args.dataset_name} -> {dataset_path}")
@@ -1212,6 +1471,10 @@ def main():
             rec = parse_cof(samp, dataset_images_root)
         elif args.dataset_name == "ReFocus":
             rec = parse_refocus(samp, dataset_images_root)
+        elif args.dataset_name == "Visual_CoT":
+            rec = parse_visual_cot_all(
+                samp, dataset_images_root, args.dataset_name, idx
+            )
         elif args.dataset_name == "Visual_CoT_v7w":
             rec = parse_visual_cot_w_choices(
                 samp, dataset_images_root, args.dataset_name, idx
@@ -1239,47 +1502,48 @@ def main():
 
     # ------------------ policy 批推理 ------------------
     print("[Policy inference] running batch...")
-    raw_outs, extr_outs, keep_mask = run_policy_batch(
-        policy_mllm,
-        convs,
-        sampling_params,
-        processor,
-        tokenizer,
-        max_model_len=args.max_model_len,
-    )
-    vllm_kill_model(policy_mllm)  #
+    if use_dp:
+        # DP 模式：每个 worker 进程独立引擎
+        raw_outs, extr_outs, keep_mask = run_policy_batch(
+            None,
+            convs,
+            None,
+            None,
+            None,
+            max_model_len=args.max_model_len,
+            dp_device_groups=dp_groups,
+            policy_model_path=args.policy_model_path,
+            tp=tp,
+        )
+    else:
+        raw_outs, extr_outs, keep_mask = run_policy_batch(
+            policy_mllm,
+            convs,
+            sampling_params,
+            processor,
+            tokenizer,
+            max_model_len=args.max_model_len,
+        )
+        vllm_kill_model(policy_mllm)  #
     # ------------------ 判分并写出 ------------------
     # ground truth list
     gts = [r["gt_answer_text"] for r in parsed_recs]
     choices_list = [r["gt_choices"] for r in parsed_recs]
 
     
-    llm_judged = [0]*len(extr_outs)  
-    quick_judged = [0]*len(extr_outs)  
-    data_spec_judged = [0]*len(extr_outs)  
-    
-    if "llm" in args.judge_mode:
-        judge_llm, _ = vllm_llm_init(
-            args.judge_llm_dir, tp=args.judge_llm_tensor_parallel_size
-        )
-        
-        questions_wo_inst = [question.replace("Put the letter of your choice within \\boxed{}.", "").replace("Put your final answer within \\boxed{}.", "") for question in questions]
-        if "VTS" in args.dataset_name:
-            gts_extracted = llm_batch_extract(gts, judge_llm, questions=questions_wo_inst if len(questions_wo_inst) > 0 else None, dataset_name="VTS")
-
-        llm_judged = llm_batch_judge(
-            extr_outs,
-            gts_extracted,
-            judge_llm,
-            questions=questions_wo_inst if len(questions_wo_inst) > 0 else None,
-        )
-    if "quick" in args.judge_mode:
-        # judged = batch_judge(extr_outs, gts, choices_list, llm=judge_llm, questions=questions_wo_inst if len(questions_wo_inst)>0 else None)
-        quick_judged = quick_batch_judge(extr_outs, gts)
-    if "data_spec" in args.judge_mode:
-        data_spec_judged = data_spec_batch_judge(extr_outs, gts, args.dataset_name)
-        
-    judged = [llm or quick or data_spec for llm, quick, data_spec in zip(llm_judged, quick_judged, data_spec_judged)]
+    # 顺序判分：quick -> data_spec -> llm，仅对上一阶段判错的继续判
+    judged = sequential_judge_predictions(
+        extr_outs,
+        gts,
+        judge_mode=args.judge_mode,
+        dataset_name=args.dataset_name,
+        judge_llm_dir=args.judge_llm_dir,
+        judge_llm_tensor_parallel_size=args.judge_llm_tensor_parallel_size,
+        questions=questions,
+        api_name=args.api_name,
+        api_max_workers=args.api_max_workers,
+        api_kwargs={"temperature": args.api_temperature} if args.api_temperature is not None else None,
+    )
         
     sid = args.start_id
     kept = 0

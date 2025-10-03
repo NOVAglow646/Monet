@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse, io, json, os, gc
 from collections import deque
 from typing import Any, Dict, List, Optional
+import multiprocessing as mp
 from itertools import islice
 from PIL import Image
 from transformers import AutoTokenizer, AutoProcessor
@@ -35,7 +36,7 @@ def iter_stage1(path: str):
                 if not rec.get("policy_correct"):
                     yield rec
         else:
-            for ln in islice(f, 16385, None): ###################################
+            for ln in islice(f, 0, None): ###################################
                 if ln.strip():
                     rec = json.loads(ln)
                     if not rec.get("policy_correct"):
@@ -147,6 +148,98 @@ def run_batch_step(
     return ret
 
 
+# ---------------- DP helpers -------------------------
+def _dp_stage2_worker_entry(
+    queue,
+    device_ids: List[int],
+    recs: List[Dict[str, Any]],
+    step_idx: int,
+    model_path: str,
+    tp: int,
+    token_limit: int,
+    shard_idx: int,
+):
+    try:
+        import os as _os
+        from transformers import AutoTokenizer as _AutoTokenizer, AutoProcessor as _AutoProcessor
+        from AAA_vllm_toolkit.load_and_gen_vllm import (
+            vllm_mllm_init as _vllm_mllm_init,
+            vllm_kill_model as _vllm_kill_model,
+        )
+        _os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in device_ids)
+        tok = _AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        proc = _AutoProcessor.from_pretrained(model_path)
+        model, sampling = _vllm_mllm_init(model_path, tp=tp)
+        try:
+            preds = run_batch_step(recs, step_idx, model, proc, tok, token_limit, sampling)
+        finally:
+            try:
+                _vllm_kill_model(model)
+            except Exception:
+                pass
+        queue.put((shard_idx, preds))
+    except Exception:
+        import traceback as _tb
+        _tb.print_exc()
+        queue.put((shard_idx, [None] * len(recs)))
+
+
+def run_batch_step_dp(
+    recs: List[Dict[str, Any]],
+    step_idx: int,
+    dp_device_groups: List[List[int]],
+    model_path: str,
+    tp: int,
+    token_limit: int,
+) -> List[Optional[str]]:
+    num_workers = len(dp_device_groups)
+    n = len(recs)
+    if n == 0:
+        return []
+    # contiguous split
+    shard_sizes = [(n + i) // num_workers for i in range(num_workers)]
+    total_assigned = sum(shard_sizes)
+    if total_assigned != n:
+        shard_sizes[0] += (n - total_assigned)
+    shards = []
+    idx = 0
+    for sz in shard_sizes:
+        shards.append(recs[idx : idx + sz])
+        idx += sz
+
+    ctx = mp.get_context("spawn")
+    queue = ctx.Queue()
+    procs: List[mp.Process] = []
+    for shard_idx, (devs, shard) in enumerate(zip(dp_device_groups, shards)):
+        if not shard:
+            queue.put((shard_idx, []))
+            continue
+        p = ctx.Process(
+            target=_dp_stage2_worker_entry,
+            args=(queue, devs, shard, step_idx, model_path, tp, token_limit, shard_idx),
+        )
+        p.daemon = False
+        p.start()
+        procs.append(p)
+
+    received = 0
+    outputs = [None] * num_workers  # type: ignore
+    while received < num_workers:
+        shard_idx, preds = queue.get()
+        outputs[shard_idx] = preds
+        received += 1
+
+    for p in procs:
+        p.join()
+
+    ret: List[Optional[str]] = []
+    for out in outputs:
+        if out is None:
+            continue
+        ret.extend(out)
+    return ret
+
+
 # ---------- main -------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser("stage2_infer")
@@ -158,17 +251,23 @@ def main():
     ap.add_argument("--token-limit", type=int, default=8192)
     ap.add_argument("--max-batch", type=int, default=0)
     # judge-side params kept for CLI 兼容但无效
-    ap.add_argument("--judge_llm_dir")
-    ap.add_argument("--judge_llm_tensor_parallel_size", type=int)
-    ap.add_argument("--max_samples", type=int, default=None)
+    ap.add_argument("--max-samples", type=int, default=None)
     args = ap.parse_args()
 
+    # 设备与 DP 判定
     os.environ["CUDA_VISIBLE_DEVICES"] = args.devices
-    model, sampling = vllm_mllm_init(
-        args.model_path, tp=args.strong_mllm_tensor_parallel_size
-    )
-    tok = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
-    proc = AutoProcessor.from_pretrained(args.model_path)
+    devices_list = [int(x) for x in args.devices.split(",") if x.strip() != ""]
+    tp = args.strong_mllm_tensor_parallel_size
+    dp_degree = len(devices_list) // tp if tp > 0 else 0
+    use_dp = dp_degree > 1
+    dp_groups = [devices_list[i * tp : (i + 1) * tp] for i in range(dp_degree)] if use_dp else []
+
+    if not use_dp:
+        model, sampling = vllm_mllm_init(
+            args.model_path, tp=args.strong_mllm_tensor_parallel_size
+        )
+        tok = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+        proc = AutoProcessor.from_pretrained(args.model_path)
 
     writer = open(args.out, "w", encoding="utf-8")
     active: deque = deque()
@@ -185,11 +284,35 @@ def main():
             }
         )
         if args.max_batch and len(active) >= args.max_batch:
-            flush_steps(active, writer, model, proc, tok, args.token_limit, sampling)
+            flush_steps(
+                active,
+                writer,
+                model if not use_dp else None,
+                proc if not use_dp else None,
+                tok if not use_dp else None,
+                args.token_limit,
+                sampling if not use_dp else None,
+                use_dp=use_dp,
+                dp_groups=dp_groups,
+                model_path=args.model_path,
+                tp=tp,
+            )
             active.clear()
 
     if active:
-        flush_steps(active, writer, model, proc, tok, args.token_limit, sampling)
+        flush_steps(
+            active,
+            writer,
+            model if not use_dp else None,
+            proc if not use_dp else None,
+            tok if not use_dp else None,
+            args.token_limit,
+            sampling if not use_dp else None,
+            use_dp=use_dp,
+            dp_groups=dp_groups,
+            model_path=args.model_path,
+            tp=tp,
+        )
 
     writer.close()
 
@@ -202,13 +325,28 @@ def flush_steps(
     tok,
     token_limit,
     sampling_params,
+    *,
+    use_dp: bool = False,
+    dp_groups: Optional[List[List[int]]] = None,
+    model_path: Optional[str] = None,
+    tp: int = 1,
 ):
     max_steps = max(len(st["rec"]["helpers"]) for st in states)
     for step in range(max_steps):
         batch_recs = [st["rec"] for st in states]
-        preds = run_batch_step(
-            batch_recs, step, model, proc, tok, token_limit, sampling_params
-        )
+        if use_dp:
+            preds = run_batch_step_dp(
+                batch_recs,
+                step,
+                dp_groups or [],
+                model_path=model_path,
+                tp=tp,
+                token_limit=token_limit,
+            )
+        else:
+            preds = run_batch_step(
+                batch_recs, step, model, proc, tok, token_limit, sampling_params
+            )
         for st, p in zip(states, preds):
             if step < len(st["preds"]):
                 st["preds"][step] = p

@@ -265,15 +265,16 @@ def quick_batch_judge(preds, gts):
 
 def data_spec_batch_judge(preds, gts, dataset_name):
     results = []
-    if dataset_name == "Zebra_CoT_maze" or "VTS" in dataset_name:
+    if dataset_name == "Zebra_CoT_maze" or "VTS" or "Visual_CoT" in dataset_name:
         for pred, gt in tqdm(zip(preds, gts), total=len(preds), desc="Judging predictions using data specific rules"):
             if pred is None:
                 results.append(0)
                 continue
-            if pred in gt:
+            if pred.lower() in gt.lower():
                 results.append(1)
             else:
                 results.append(0)
+    
     else:
         raise NotImplementedError
     return results
