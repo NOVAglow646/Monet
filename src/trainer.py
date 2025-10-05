@@ -1517,22 +1517,14 @@ class CustomTrainerAVT_V5_Stage1(SFTTrainer):
             kwargs['processing_class'] = kwargs.pop('tokenizer')
         super().__init__(*args, **kwargs)
 
-        # Representation analysis
-        self.rep_analyzer = None
-        args_cfg = self.args
-
-        # 仅 rank‑0 进程写文件，防止多卡重复
-        self.is_main_process = (
-            not torch.distributed.is_initialized()
-            or torch.distributed.get_rank() == 0
-        )
         self.ce_emphasize_factor = self.args.ce_emphasize_factor
+        self.teacher_ce_loss_cum = 0.0        # cumulative teacher CE loss
+        self.teacher_ce_loss_steps = 0
         self.observation_token_acc = 0.
         self.observation_token_acc_step = 0
+        self.alignment_loss_cum = 0.
+        self.alignment_loss_steps = 0
 
-        # align vision latent loss
-        self.align_vision_latent_loss_cum = 0.
-        self.align_vision_latent_loss_steps = 0
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
@@ -1572,14 +1564,16 @@ class CustomTrainerAVT_V5_Stage1(SFTTrainer):
             latent_only_loss = compute_latents_only_loss(outputs.ce_patch_vec, self.args.alignment_weight *alignment_loss)
             loss = self.args.emphasize_latent_weight * latent_only_loss + teacher_ce_loss
         else:
-            loss = teacher_ce_loss + self.alignment_weight * alignment_loss
+            loss = teacher_ce_loss + self.args.alignment_weight * alignment_loss
 
         if getattr(teacher_output, 'mean_emphasize_acc', None) is not None:
             self.observation_token_acc += getattr(teacher_output, 'mean_emphasize_acc')
             self.observation_token_acc_step += 1
 
-        latent_only_loss = compute_latents_only_loss(outputs.ce_patch_vec, total_loss)
-        total_loss = latent_only_loss * self.args.emphasize_latent_weight + total_loss
+        self.teacher_ce_loss_cum += teacher_ce_loss.item()
+        self.teacher_ce_loss_steps += 1
+        self.alignment_loss_cum += alignment_loss.item()
+        self.alignment_loss_steps += 1
 
         # Light-touch cleanup without forcing GPU sync every step
         #del teacher_outputs
@@ -1602,15 +1596,24 @@ class CustomTrainerAVT_V5_Stage1(SFTTrainer):
     def log(self, logs: dict, start_time: float | None = None):
         # Merge our rolling averages into the standard logs once per logging call
         merged = dict(logs)
+        if self.teacher_ce_loss_cum > 0:
+            merged["teacher_ce_loss"] = round(self.teacher_ce_loss_cum / max(1, self.teacher_ce_loss_steps), 6)
+            self.teacher_ce_loss_cum = 0.0
+            self.teacher_ce_loss_steps = 0
+        if self.alignment_loss_cum > 0:
+            merged[f'alignment_loss'] = round(self.alignment_loss_cum / max(1, self.alignment_loss_steps), 6)
+            self.alignment_loss_cum = 0.0
+            self.alignment_loss_steps = 0
         if self.observation_token_acc_step > 0:
             merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
             self.observation_token_acc = 0.
             self.observation_token_acc_step = 0
 
+
         # Call parent to keep default behavior (console/TB/W&B/etc.)
         return super().log(merged, start_time)
 
-class CustomTrainerAVT_V2_Stage2(SFTTrainer):
+class CustomTrainerAVT_V5_Stage2(SFTTrainer):
     def __init__(self, *args, **kwargs): 
         self.exp_name =kwargs.pop('exp_name')
         super().__init__(*args, **kwargs)

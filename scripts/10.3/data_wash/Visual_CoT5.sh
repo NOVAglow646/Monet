@@ -20,7 +20,7 @@ python -m dataset_utils.stage1_append \
     --api_max_workers 64 \
     --batch 1024 \
     --policy_batch 256 \
-    --groups_per_gpu 2 \
+    --groups_per_gpu 1 \
     --gpu_memory_utilization 0.9
 
 python -m dataset_utils.stage2_infer \

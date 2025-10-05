@@ -810,6 +810,133 @@ def collate_fn_avt_v4(examples, alignment="boxed_start"):
 
     return batch
 
+def collate_fn_avt_v5_stage1(examples):
+    if _rank == 0:
+        start_time = time()
+    batch = {}
+    metadata = [ex['metadata'] for ex in examples]
+    examples = [ex['data'] for ex in examples]
+
+    texts = [processor.apply_chat_template(ex, tokenize=False) for ex in examples]
+
+    # replace `<abs_vis_token></abs_vis_token>`` with `<|vision_start|><|image_pad|><|vision_end|>`` for each `<|im_start|>assistant`` content
+    texts = [place_output_image_avt(text) for text in texts]
+    
+    # add `<abs_vis_token><abs_vis_token_pad>...</abs_vis_token>` after each `<|vision_start|><|image_pad|><|vision_end|>` for each `<|im_start|>assistant` content
+    texts = add_abs_vis_token_after_helper_img(texts, args.latent_size, "<abs_vis_token_pad>")
+    
+    image_inputs, _ = process_vision_info(examples)
+    if args.image_resize == "global":
+        image_inputs, new_sizes = resize_by_token_budget(image_inputs)
+    elif args.image_resize == "clear_question_img":
+        image_inputs, new_sizes = resize_diff(image_inputs)
+
+    total_image_pads = 0    
+    for txt in texts:
+        total_image_pads += txt.count("<|vision_start|><|image_pad|>")
+    assert total_image_pads == len(image_inputs)
+    batch = processor(text=texts, images=image_inputs, return_tensors="pt", padding=True)
+    batch['metadata'] = metadata
+    if not args.not_use_4d:
+        attn_mask_4d, _ = build_4d_attn(
+            input_ids=batch["input_ids"],
+            pad_mask=batch["attention_mask"],
+            token_ids=SPECIAL_id,
+            not_mask_image=args.not_mask_image,
+            mask_latent=args.mask_latent,
+            observation_tokens_cannot_see_question_image=args.observation_tokens_cannot_see_question_image,
+            observation_tokens_only_see_question_and_latent=args.observation_tokens_only_see_question_and_latent,
+            latent_can_see_all_previous=args.latent_can_see_all_previous,
+            return_type='bool',
+            mask_question_image=args.mask_question_image
+        )
+        batch["attention_mask_4d"] = {"full_attention": attn_mask_4d }
+
+    
+    observation_start_poss = find_ids_poss(batch["input_ids"], answer_start_pattern, observation_start_idx)
+    observation_end_poss = find_ids_poss(batch["input_ids"], answer_start_pattern, observation_end_idx)
+    batch["observation_poss"] = []
+    assert len(observation_start_poss) == len(observation_end_poss)
+    for start_poss, end_poss in zip(observation_start_poss, observation_end_poss):
+        poss_of_a_sample = []
+        if len(start_poss) > 0 and len(end_poss) > 0:
+            assert len(start_poss) == len(end_poss), f"start_poss: {start_poss}, end_poss: {end_poss}"
+            for start, end in zip(start_poss, end_poss):
+                poss_of_a_sample.extend(list(range(start, end)))
+        batch["observation_poss"].append(poss_of_a_sample)
+
+    if args.only_predict_obs:
+        batch["labels"] = generate_labels_after_multi_token_start_only_allow(batch["input_ids"], answer_start_pattern, allowed_poss=batch["observation_poss"])
+    else:
+        batch["labels"] = generate_labels_after_multi_token_start(batch["input_ids"], answer_start_pattern, ignore_ids=[end_pad_token_idx, 
+        latent_pad_idx, latent_end_idx, img_pad_idx, img_start_idx, img_end_idx, observation_start_idx, observation_end_idx])
+
+    return batch
+
+def collate_fn_avt_v5_stage2(examples, alignment="boxed_start"):
+    # Support wrapped examples providing sample_id
+    batch = {}
+    batch['metadata'] = [ex['metadata'] for ex in examples]
+    examples = [ex['data'] for ex in examples]
+    batch_assistant_img_cnts = [sum(1 for step in examples[i][2]['content'] if step["type"] == "image") for i in range(len(examples))]
+    texts = [processor.apply_chat_template(ex, tokenize=False) for ex in examples]
+
+    # replace <abs_vis_token></abs_vis_token> with <|vision_start|><|image_pad|><|vision_end|> for each <|im_start|>assistant content
+    texts = [place_output_image_avt(text) for text in texts]
+    image_inputs, _ = process_vision_info(examples)
+    image_inputs, new_sizes = resize_by_token_budget(image_inputs, global_max_pixels=2000*28*28, per_img_max_pixels=2000*28*28,)
+    
+    ################################################
+    # student
+    ################################################
+    # replace <|vision_start|><|image_pad|><|vision_end|> with <abs_vis_token><abs_vis_token_pad>...</abs_vis_token> for each <|im_start|>assistant content
+    student_texts = replace_visual_spectial_tokens_avt(texts, args.latent_size, "<abs_vis_token_pad>")
+    user_examples = remove_assistant_images(examples)
+    user_image_inputs, _ = process_vision_info(user_examples)
+    resize_ptr = 0
+    if new_sizes is not None:
+        for i, img in enumerate(user_image_inputs):
+            img = img.resize(new_sizes[resize_ptr], Image.BICUBIC)
+            user_image_inputs[i] = img
+            resize_ptr += batch_assistant_img_cnts[i] + 1 # user_image_inputs only contain question images of each batch sample, so we need to skip the helper images in the new_sizes by adding batch_assistant_img_cnts[i]
+    student_batch = processor(text=student_texts, images=user_image_inputs, return_tensors="pt", padding=True)
+    total_image_pads = 0
+    for txt in student_texts:
+        total_image_pads += txt.count("<|image_pad|>")
+    assert total_image_pads == len(user_image_inputs)
+    batch['student_pixel_values'] = student_batch['pixel_values']
+    batch['student_image_grid_thw'] = student_batch['image_grid_thw']
+    batch["student_input_ids"] = student_batch["input_ids"]
+    batch["student_attention_mask"] = student_batch["attention_mask"]
+
+    if args.mask_latent:
+        attn_mask_4d = build_4d_attn_wo_helper_images(
+            input_ids=batch["student_input_ids"],
+            pad_mask=batch["student_attention_mask"],
+            token_ids=SPECIAL_id,
+            mask_latent=getattr(args, 'mask_latent', False),
+        )
+        batch["student_attention_mask_4d"] = {"full_attention": attn_mask_4d }
+
+    batch["student_alignment_poss"] = find_ids_poss(batch["student_input_ids"], answer_start_pattern, latent_pad_idx)
+
+    observation_start_poss = find_ids_poss(batch["student_input_ids"], answer_start_pattern, observation_start_idx)
+    observation_end_poss = find_ids_poss(batch["student_input_ids"], answer_start_pattern, observation_end_idx)
+    batch["observation_poss"] = []
+    assert len(observation_start_poss) == len(observation_end_poss)
+    for start_poss, end_poss in zip(observation_start_poss, observation_end_poss):
+        poss_of_a_sample = []
+        if len(start_poss) > 0 and len(end_poss) > 0:
+            assert len(start_poss) == len(end_poss), f"start_poss: {start_poss}, end_poss: {end_poss}"
+            for start, end in zip(start_poss, end_poss):
+                poss_of_a_sample.extend(list(range(start+1, end)))
+        batch["observation_poss"].append(poss_of_a_sample)
+
+    # mask tokens of '<|im_start|>assistant', '<|endoftext|>', and '<abs_vis_token_pad>' 
+    batch["student_labels"] = generate_labels_after_multi_token_start(batch["student_input_ids"], answer_start_pattern, ignore_ids=[img_pad_idx, img_start_idx, img_end_idx, end_pad_token_idx, latent_pad_idx, latent_end_idx, observation_start_idx, observation_end_idx])
+
+    return batch
+
 
 preprocess_function = task_preporcess_config[args.task]
 all_train_dataset = []
@@ -886,7 +1013,12 @@ elif args.stage == 'avt_v3_1':
 elif args.stage == 'avt_v4':
     CustomTrainer = CustomTrainerAVT_V4
     collate_fn = partial(collate_fn_avt_v4)
-
+elif args.stage == 'avt_v5_stage1':
+    CustomTrainer = CustomTrainerAVT_V5_Stage1
+    collate_fn = partial(collate_fn_avt_v5_stage1)
+elif args.stage == 'avt_v5_stage2':
+    CustomTrainer = CustomTrainerAVT_V5_Stage2
+    collate_fn = partial(collate_fn_avt_v5_stage2)
 
 if args.deepspeed != "":
     print(f"Note: DeepSpeed is enabled. Using the deepspeed config in {args.deepspeed} (the bsz per device and gradient_accumulation_steps will be adopted from the deepspeed config)")
@@ -895,7 +1027,7 @@ if args.stage == 'avt_v2_stage1':
     gradient_checkpointing = False
 elif args.stage == 'avt_v2_stage2':
     gradient_checkpointing = False
-elif args.stage in ['avt_sft','avt_stage1','avt_v3', 'avt_v3_1','avt_v4']:
+elif args.stage in ['avt_sft','avt_stage1','avt_v3', 'avt_v3_1','avt_v4', 'avt_v5_stage1','avt_v5_stage2']:
     gradient_checkpointing = True
 
 
@@ -982,7 +1114,7 @@ elif args.stage in ['avt_v4']:
     setattr(training_args, 'teacher_reps_dir', args.teacher_reps_dir)
     setattr(training_args, 'no_ce', args.no_ce)
 
-elif args.stage in ['avt_v5']:
+elif args.stage in ['avt_v5_stage1','avt_v5_stage2']:
     setattr(training_args, 'ce_emphasize_factor', args.ce_emphasize_factor)
     setattr(training_args, 'alignment_layer', args.alignment_layer)
     setattr(training_args, 'alignment_weight', args.alignment_weight)

@@ -16,7 +16,7 @@ def get_args():
     # ===== Basic arguments =====
     parser.add_argument("--load_model_path", type=str, default='./checkpoints/model_stage1')
     parser.add_argument("--data_path", type=str, default='PathToJsonlData', nargs='+')
-    parser.add_argument("--stage", type=str, default="avt_stage1", choices=['avt_sft', 'avt_stage1', 'avt_v2_stage1', 'avt_v2_precompute_latent', 'avt_v2_stage2', 'avt_v3', 'avt_v3_1', 'avt_v4'])
+    parser.add_argument("--stage", type=str, default="avt_stage1", choices=['avt_sft', 'avt_stage1', 'avt_v2_stage1', 'avt_v2_precompute_latent', 'avt_v2_stage2', 'avt_v3', 'avt_v3_1', 'avt_v4', 'avt_v5_stage1', 'avt_v5_stage2'])
     parser.add_argument("--task", type=str, default="vsp-spatial-reasoning", choices=["vsp-spatial-reasoning", "vsp-spatial-planning", "blink-jigsaw", "sat", "mm-reasoning"])
     parser.add_argument("--save_model_path", type=str, default='./checkpoints/',help="Path to save the model checkpoints.")
     parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")

@@ -1883,7 +1883,10 @@ class Qwen2_5_VLModel(Qwen2_5_VLPreTrainedModel):
                 # Avoid in-place modification on an expanded view to prevent autograd versioning issues
                 position_ids = position_ids + delta.to(position_ids.device)
 
-        if segs is not None:
+        if segs is not None and (
+            'align_vision_latent_projector' in kwargs.get('loss_type', []) or
+            'align_vision_latent_pooling' in kwargs.get('loss_type', [])
+        ):
             if 'align_vision_latent_projector' in kwargs['loss_type']:
                 '''projectors = compute_affine_projectors(
                     inputs_embeds=inputs_embeds,  # [B, S, d]
