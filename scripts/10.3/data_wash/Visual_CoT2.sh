@@ -17,7 +17,11 @@ python -m dataset_utils.stage1 \
     --policy_mllm_tensor_parallel_size 1 \
     --judge_mode data_spec api \
     --api_name gemini-2.5-pro \
-    --api_max_workers 64
+    --api_max_workers 64 \
+    --batch 1024 \
+    --policy_batch 256 \
+    --groups_per_gpu 2 \
+    --gpu_memory_utilization 0.9
 
 python -m dataset_utils.stage2_infer \
     --stage1 /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual_CoT/stage1_policy_out_2.jsonl \

@@ -41,6 +41,23 @@ def compute_latents_only_loss(latents, loss_for_latents):
     proxy_loss = torch.stack([(v * g).sum() for v, g in zip(ce_vec_list, safe_grads)]).sum()
     return proxy_loss
 
+def load_offline_tensor(tensor_dir, batch_metadata, alignment_layer="all_layers"):
+    teacher_reps = None
+    teacher_ce_loss = None
+    latents_list = []
+    for metadata in batch_metadata:
+        dataset_name = metadata['dataset_name']
+        sample_id = metadata['sample_id']
+        metadata_info = f"{alignment_layer}_{dataset_name}_{sample_id}"
+        path = os.path.join(tensor_dir, f"rep_{metadata_info}.pt")
+        if not os.path.isfile(path):
+            latents_list = []
+            raise RuntimeError(f"Missing teacher latent file: {path}")
+        data = torch.load(path, map_location='cpu')
+        latents_list.append(data['latent'].detach())
+    if batch_metadata is not None and len(latents_list) == len(batch_metadata):
+        teacher_reps = latents_list
+    return teacher_reps
 
 class CustomTrainerStage1(SFTTrainer):
         
@@ -1382,23 +1399,7 @@ class CustomTrainerAVT_V4(SFTTrainer):
             teacher_ce_loss = None
         else:       
             # Try to load precomputed teacher latents
-            teacher_reps = None
-            batch_metadata = inputs['metadata']
-            teacher_ce_loss = None
-            latents_list = []
-            for metadata in batch_metadata:
-                dataset_name = metadata['dataset_name']
-                sample_id = metadata['sample_id']
-                metadata_info = f"{self.args.alignment_layer}_{dataset_name}_{sample_id}"
-                path = os.path.join(self.teacher_reps_dir, f"rep_{metadata_info}.pt")
-                if not os.path.isfile(path):
-                    latents_list = []
-                    raise RuntimeError(f"Missing teacher latent file: {path}")
-                data = torch.load(path, map_location='cpu')
-                latents_list.append(data['latent'].detach())
-            if batch_metadata is not None and len(latents_list) == len(batch_metadata):
-                teacher_reps = latents_list
-
+            teacher_reps = load_offline_tensor(self.teacher_reps_dir, batch_metadata=inputs['metadata'], alignment_layer=self.args.alignment_layer)
 
 
         # Student alignment forward
@@ -1508,6 +1509,248 @@ class CustomTrainerAVT_V4(SFTTrainer):
         # Call parent to keep default behavior (console/TB/W&B/etc.)
         return super().log(merged, start_time)
 
+class CustomTrainerAVT_V5_Stage1(SFTTrainer):
+    def __init__(self, *args, **kwargs):
+        self.exp_name = kwargs.pop('exp_name')
+        # accept processing_class (preferred) and fall back to tokenizer for backward compat
+        if 'processing_class' not in kwargs and 'tokenizer' in kwargs:
+            kwargs['processing_class'] = kwargs.pop('tokenizer')
+        super().__init__(*args, **kwargs)
+
+        # Representation analysis
+        self.rep_analyzer = None
+        args_cfg = self.args
+
+        # 仅 rank‑0 进程写文件，防止多卡重复
+        self.is_main_process = (
+            not torch.distributed.is_initialized()
+            or torch.distributed.get_rank() == 0
+        )
+        self.ce_emphasize_factor = self.args.ce_emphasize_factor
+        self.observation_token_acc = 0.
+        self.observation_token_acc_step = 0
+
+        # align vision latent loss
+        self.align_vision_latent_loss_cum = 0.
+        self.align_vision_latent_loss_steps = 0
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        """
+        Compute training loss and additionally compute token accuracies
+        """
+        inputs['stage'] = 'avt_v2_stage1'
+        inputs['latent_mode'] = True
+        inputs['loss_type'] = []
+        #inputs['enable_ce_checkpoint'] = False
+        outputs = model(**inputs, return_dict=True, output_hidden_states=False)
+        
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+
+        inputs['latent_mode'] = False
+        inputs['ce_patch_pos'] = outputs.ce_patch_pos
+        inputs['ce_patch_vec'] = outputs.ce_patch_vec
+        inputs['ce_emphasize_poss'] = inputs['observation_poss']
+        # Dynamic warmup factor passed to model.forward
+        inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
+        inputs['loss_type'] = ['ce', 'alignment']
+        inputs['compute_emphasize_acc'] = True
+        # Ensure training forward does NOT request attentions (prevents checkpoint recompute mismatch)
+        inputs.pop('output_attentions', None)
+        inputs.pop('attn_analysis', None)
+        inputs.pop('attention_mask_4d')
+        teacher_reps = load_offline_tensor(self.args.teacher_reps_dir, batch_metadata=inputs['metadata'], 
+        alignment_layer=self.args.alignment_layer)
+        inputs['alignment_poss'] = inputs['observation_poss']
+        inputs['teacher_hidden_states_for_alignment'] = teacher_reps
+        teacher_ce_loss, teacher_output = super().compute_loss(
+                model, 
+                inputs,
+                return_outputs=True, num_items_in_batch=num_items_in_batch
+            )
+        alignment_loss = teacher_output.loss_dict['alignment']
+        if self.args.emphasize_latent_weight != 1.0:
+            latent_only_loss = compute_latents_only_loss(outputs.ce_patch_vec, self.args.alignment_weight *alignment_loss)
+            loss = self.args.emphasize_latent_weight * latent_only_loss + teacher_ce_loss
+        else:
+            loss = teacher_ce_loss + self.alignment_weight * alignment_loss
+
+        if getattr(teacher_output, 'mean_emphasize_acc', None) is not None:
+            self.observation_token_acc += getattr(teacher_output, 'mean_emphasize_acc')
+            self.observation_token_acc_step += 1
+
+        latent_only_loss = compute_latents_only_loss(outputs.ce_patch_vec, total_loss)
+        total_loss = latent_only_loss * self.args.emphasize_latent_weight + total_loss
+
+        # Light-touch cleanup without forcing GPU sync every step
+        #del teacher_outputs
+        step = int(getattr(self.state, 'global_step', 0) or 0)
+        if step % 50 == 0:
+            try:
+                gc.collect()
+                # Avoid calling empty_cache() each step
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+        return (loss, None) if return_outputs else loss
+
+
+    def on_epoch_end(self):
+        # 注意：HF Trainer 不会自动调用子类自定义的 on_epoch_end；实际汇总通过回调实现。
+        return super().on_epoch_end()
+
+    def log(self, logs: dict, start_time: float | None = None):
+        # Merge our rolling averages into the standard logs once per logging call
+        merged = dict(logs)
+        if self.observation_token_acc_step > 0:
+            merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
+            self.observation_token_acc = 0.
+            self.observation_token_acc_step = 0
+
+        # Call parent to keep default behavior (console/TB/W&B/etc.)
+        return super().log(merged, start_time)
+
+class CustomTrainerAVT_V2_Stage2(SFTTrainer):
+    def __init__(self, *args, **kwargs): 
+        self.exp_name =kwargs.pop('exp_name')
+        super().__init__(*args, **kwargs)
+        self.weight = self.args.alignment_weight
+        self.ce_emphasize_factor: float = float(getattr(self.args, 'ce_emphasize_factor', 1.0))
+        # Where to read precomputed teacher latents
+        base_save = getattr(self.args, 'output_dir', './checkpoints')
+        self.teacher_latent_dir = getattr(self.args, 'teacher_latent_dir', None)
+        if not self.teacher_latent_dir:
+            # fall back to user-specified save_model_path-like; use output_dir parent by default
+            self.teacher_latent_dir = os.path.join(base_save if base_save else './checkpoints', 'teacher_latents')
+        # 仅 rank‑0 进程写文件，防止多卡重复
+        self.is_main_process = (
+            not torch.distributed.is_initialized()
+            or torch.distributed.get_rank() == 0
+        )
+
+        self.observation_token_acc = 0.
+        self.observation_token_acc_step = 0
+        self._al_loss_cum = 0.0       # cumulative alignment loss since last log
+        self._al_steps = 0            # number of micro-steps accumulated
+        self.student_ce_loss_cum = 0.0        # cumulative student CE loss
+        self.student_ce_loss_steps = 0
+
+
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        """
+        Compute training loss for AVT v2 stage2 with optional cached teacher latents.
+        """
+        # Try to load precomputed teacher latents
+        teacher_latents = None
+        batch_metadata = inputs['metadata']
+
+        latents_list = []
+        for metadata in batch_metadata:
+            dataset_name = metadata['dataset_name']
+            sample_id = metadata['sample_id']
+            metadata_info = f"{self.args.alignment_layer}_{dataset_name}_{sample_id}"
+            path = os.path.join(self.teacher_latent_dir, f"latent_{metadata_info}.pt")
+            if not os.path.isfile(path):
+                latents_list = []
+                raise RuntimeError(f"Missing teacher latent file: {path}")
+            data = torch.load(path, map_location='cpu')
+            latents_list.append(data['latent'].detach())
+        if batch_metadata is not None and len(latents_list) == len(batch_metadata):
+            teacher_latents = latents_list
+
+        # Student alignment forward
+        inputs['latent_mode'] = True
+        inputs['input_ids'] = inputs['student_input_ids']
+        inputs['attention_mask'] = inputs['student_attention_mask']
+        inputs['pixel_values'] = inputs['student_pixel_values']
+        inputs['image_grid_thw'] = inputs['student_image_grid_thw']
+        if 'labels' in inputs:
+            inputs.pop('labels')
+        inputs['alignment_poss'] = inputs['student_alignment_poss']
+        inputs['teacher_hidden_states_for_alignment'] = teacher_latents
+        model.gradient_checkpointing_disable()
+        inputs['loss_type'] = ['alignment']
+        inputs['output_latent_embeds'] = False
+        (_, student_outputs) = super().compute_loss(
+            model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+        )
+        alignment_loss = student_outputs.loss_dict['alignment']
+
+        # Student CE forward
+        inputs['latent_mode'] = False
+        inputs['labels'] = inputs['student_labels']
+        inputs['ce_patch_pos'] = student_outputs.ce_patch_pos
+        inputs['ce_patch_vec'] = student_outputs.ce_patch_vec
+        inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
+        inputs['ce_emphasize_poss'] = inputs['observation_poss']
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        inputs['loss_type'] = ['ce']
+        inputs['compute_emphasize_acc'] = True
+        if 'student_attention_mask_4d' in inputs:
+            inputs['attention_mask_4d'] = inputs.pop('student_attention_mask_4d')
+        (student_ce_loss, student_outputs) = super().compute_loss(
+            model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+        )
+        if getattr(student_outputs, 'mean_emphasize_acc', None) is not None:
+            self.observation_token_acc += getattr(student_outputs, 'mean_emphasize_acc')
+            self.observation_token_acc_step += 1
+        
+        alignment_loss = alignment_loss.to(student_ce_loss.device, dtype=student_ce_loss.dtype)
+        if isinstance(self.weight, torch.Tensor):
+            self.weight = self.weight.to(student_ce_loss.device, dtype=student_ce_loss.dtype)
+        else:
+            self.weight = student_ce_loss.new_tensor(float(self.weight))
+        loss = student_ce_loss + self.weight * alignment_loss
+
+        outputs_student_loss = student_ce_loss.item()
+
+        # Periodic light GC on main process
+        del student_outputs
+        step = int(getattr(self.state, 'global_step', 0) or 0)
+        if self.is_main_process and step > 0 and (step % 20 == 0):
+            try:
+                gc.collect()
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+        # Logging
+        self._al_loss_cum += float(alignment_loss.detach().item())
+        self._al_steps += 1
+        self.student_ce_loss_cum += outputs_student_loss
+        self.student_ce_loss_steps += 1
+
+        '''if self.is_main_process:
+            with open(self.loss_log_path, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    self.state.global_step,
+                    self.state.epoch,
+                    float(loss.detach().item()),
+                    outputs_student_loss,
+                    float(alignment_loss.detach().item()),
+                ])'''
+        return (loss, None) if return_outputs else loss
+    
+    def log(self, logs: dict, start_time: float | None = None):
+        # Merge our rolling averages into the standard logs once per logging call
+        merged = dict(logs)
+        if self._al_steps > 0:
+            merged["alignment_loss"] = round(self._al_loss_cum / max(1, self._al_steps), 6)
+            self._al_loss_cum = 0.0
+            self._al_steps = 0
+        if self.student_ce_loss_steps > 0:
+            merged["student_ce_loss"] = round(self.student_ce_loss_cum / max(1, self.student_ce_loss_steps), 6)
+            self.student_ce_loss_cum = 0.0
+            self.student_ce_loss_steps = 0
+        if self.observation_token_acc_step > 0:
+            merged["observation_token_acc"] = round(self.observation_token_acc/ max(1, self.observation_token_acc_step), 6)
+            self.observation_token_acc = 0.
+            self.observation_token_acc_step = 0
+
+        # Call parent to keep default behavior (console/TB/W&B/etc.)
+        return super().log(merged, start_time)
 
 
 import weakref

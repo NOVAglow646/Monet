@@ -18,7 +18,6 @@ from PIL import Image
 
 # quick setup of the parameters
 # model setup
-max_model_len = 4096
 max_num_seqs = 1024 # processing speed
 #tp = 4
 temperature = 0.1
@@ -43,7 +42,7 @@ qwen_instruct_prompt = "\n\nPlease reason step by step, and put your final answe
 ####################################################################################################################
 
 
-def vllm_mllm_init(mllm_dir, tp=4, gpu_memory_utilization=0.95):
+def vllm_mllm_init(mllm_dir, tp=4, gpu_memory_utilization=0.95, max_model_len=4096):
 
     engine_args = EngineArgs(
         model=mllm_dir,
