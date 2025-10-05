@@ -6,7 +6,7 @@ source /pfs/wangzihao11/miniconda3/bin/activate
 conda activate mirage
 cd /mmu_vcg_ssd/shiyang06/Project/Latent_Think/abstract-visual-token/new
 
-python -m dataset_utils.stage1 \
+python -m dataset_utils.stage1_append \
     --dataset-name Visual_CoT \
     --dataset_path /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual-CoT/viscot_363k_5.json \
     --dataset_images_root /ytech_m2v5_hdd/workspace/kling_mm/shiyang06/Dataset/abstract_visual/Visual-CoT/cot_images_tar_split \
