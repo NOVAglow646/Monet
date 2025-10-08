@@ -288,5 +288,333 @@ examples_pool_exact = {
         "sys_prompt": ALIGN_SYS_PROMPT_wo_boxed,
         "examples": VTS_examples
     },
+    "Zebra_CoT_arc_agi": {
+        "sys_prompt": ALIGN_SYS_PROMPT_exact,
+        "examples": 
+        """
+Here is an example:
+## Input:
+You will be provided with input/output pairs demonstrating the nature of the task. Then, you will see the current test input grid. Your task is to infer rules from the task demonstrations and apply them to the test input to predict the output grid.
 
+Color mapping for matrices:
+0: black
+1: blue
+2: red
+3: green
+4: yellow
+5: grey
+6: fuschia
+7: orange
+8: teal
+9: brown
+
+Here are the task demonstrations:
+Task Demonstration 1:
+Input: <abs_vis_token></abs_vis_token>
+Output: <abs_vis_token></abs_vis_token>
+
+Task Demonstration 2:
+Input: <abs_vis_token></abs_vis_token>
+Output: <abs_vis_token></abs_vis_token>
+
+Task Demonstration 3:
+Input: <abs_vis_token></abs_vis_token>
+Output: <abs_vis_token></abs_vis_token>
+
+Here is the test input:
+Test Input 1:
+<abs_vis_token></abs_vis_token>
+<STEP_0>
+THOUGHT 0: The primary goal is to understand the transformation rule from the input grid to the output grid by observing the provided examples. I will pay close attention to how different colors, especially black (0) and red (2), are treated. I will visualize the grids to better understand the spatial relationships.<END_STEP_0>\n<STEP_1>
+THOUGHT 1: Let's examine Task Demonstration 1. The input grid contains red (2) and orange (7) cells, with the rest being black (0).
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+In this example, I can see that all black cells in the input have become green (3) in the output. The original orange cells are preserved. The red cells from the input have taken on the orange color. Furthermore, the orange shape appears to have expanded or been reflected across the positions of the original red cells. For instance, the red cell at (5,3) next to orange (5,4) resulted in (5,3) becoming orange and also (5,2) becoming orange. However, the red cell at (4,3) next to orange (4,4) resulted in (4,3) becoming orange, but (4,2) remained green. This suggests the reflection/extension is conditional.<END_STEP_1>\n<STEP_2>
+THOUGHT 2: Now, let's look at Task Demonstration 2. The input grid features red (2) and fuchsia (6) cells.
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+Similar to the first example, black cells turned green. The fuchsia shape is preserved and expanded. Red cells have turned fuchsia and acted as bridges, extending the fuchsia shape symmetrically. For example, the red cells at (3,3) and (3,4) are adjacent to fuchsia cells. They become fuchsia, and the fuchsia color extends further, filling out a larger shape.<END_STEP_2>\n<STEP_3>
+THOUGHT 3: Next, Task Demonstration 3. The input grid has red (2) and teal (8) cells.
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+Again, the black background becomes green. The teal shape is preserved. The red cell at (6,5) is adjacent to the teal cell at (5,5). In the output, (6,5) becomes teal, and the teal color is extended to (7,5) and also to connect with the teal cells at (4,3), (4,4), (4,5), forming a larger connected teal shape that appears symmetric.<END_STEP_3>\n<STEP_4>
+THOUGHT 4: Finally, Task Demonstration 4. The input grid contains red (2) and yellow (4) cells.
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+The pattern continues: black cells become green. The original yellow cells are maintained. The red cells turn yellow and cause the yellow shape to expand symmetrically. For instance, the red cell at (3,5) adjacent to yellow (3,4) makes (3,5) yellow and extends yellow to (3,6). This creates a continuous yellow bar. The red cells at (4,5) and (5,5) similarly extend the yellow shape.<END_STEP_4>\n<STEP_5>
+THOUGHT 5: Now I will apply the observed general transformation pattern to Test Input 1. The input grid is:
+<abs_vis_token></abs_vis_token>
+The input contains blue (1) cells at (3,4), (4,4), (4,5), and (5,5). Red (2) cells are at (4,6) and (5,6).
+Based on the patterns observed:
+1. All black (0) cells will become green (3) in the output.
+2. The original blue cells will retain their color. So, output cells (3,4), (4,4), (4,5), and (5,5) will be blue.
+3. Consider the red cell at (4,6). It's adjacent to the blue cell at (4,5). Thus, in the output, cell (4,6) will become blue. The symmetric extension rule implies that the cell on the other side of (4,6) from (4,5), which is (4,7), will also become blue.
+4. Consider the red cell at (5,6). It's adjacent to the blue cell at (5,5). Thus, in the output, cell (5,6) will become blue. The provided solution indicates that the symmetric extension to (5,7) does not turn blue but remains green. This is a specific behavior similar to what was observed in Demo 1 where not all potential reflections occurred.
+5. The blue cell at (3,4) in the input appears to gain a symmetric counterpart at (3,7) in the output. This suggests a reflection across a vertical axis (around x=5.5), likely influenced by the overall symmetric pattern being formed by the other transformations involving red cells.
+Combining these transformations, the predicted output grid should be:
+<abs_vis_token></abs_vis_token>
+This visual output corresponds to the matrix provided in the final answer.
+<END_STEP_5>
+
+ 
+## Your output:
+You will be provided with input/output pairs demonstrating the nature of the task. Then, you will see the current test input grid. Your task is to infer rules from the task demonstrations and apply them to the test input to predict the output grid.
+
+Color mapping for matrices:
+0: black
+1: blue
+2: red
+3: green
+4: yellow
+5: grey
+6: fuschia
+7: orange
+8: teal
+9: brown
+
+Here are the task demonstrations:
+Task Demonstration 1:
+Input: <abs_vis_token></abs_vis_token>
+Output: <abs_vis_token></abs_vis_token>
+
+Task Demonstration 2:
+Input: <abs_vis_token></abs_vis_token>
+Output: <abs_vis_token></abs_vis_token>
+
+Task Demonstration 3:
+Input: <abs_vis_token></abs_vis_token>
+Output: <abs_vis_token></abs_vis_token>
+
+Here is the test input:
+Test Input 1:
+<abs_vis_token></abs_vis_token>
+<STEP_0>
+THOUGHT 0: The primary goal is to understand the transformation rule from the input grid to the output grid by observing the provided examples. I will pay close attention to how different colors, especially black (0) and red (2), are treated. I will visualize the grids to better understand the spatial relationships.<END_STEP_0>\n<STEP_1>
+THOUGHT 1: Let's examine Task Demonstration 1. The input grid contains <observation>red (2) and orange (7)</observation> cells, with the rest being black (0).
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+In this example, I can see that all black cells in the input have become <observation>green (3)</observation> in the output. The original orange cells are <observation>preserved</observation>. The red cells from the input have taken on the <observation>orange</observation> color. Furthermore, the orange shape appears to have expanded or been reflected across the positions of the original red cells. For instance, the red cell at (5,3) next to orange (5,4) resulted in (5,3) becoming orange and also (5,2) becoming orange. However, the red cell at <observation>(4,3)</observation> next to <observation>orange (4,4)</observation> resulted in <observation>(4,3) becoming orange</observation>, but <observation>(4,2) remained green</observation>. This suggests the reflection/extension is conditional.<END_STEP_1>\n<STEP_2>
+THOUGHT 2: Now, let's look at Task Demonstration 2. The input grid features <observation>red (2) and fuchsia (6)</observation> cells.
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+Similar to the first example, black cells turned <observation>green</observation>. The fuchsia shape is <observation>preserved and expanded</observation>. Red cells have turned <observation>fuchsia</observation> and <observation>acted as bridges</observation>, extending the fuchsia shape symmetrically. For example, the red cells at <observation>(3,3) and (3,4)</observation> are adjacent to <observation>fuchsia cells</observation>. They become fuchsia, and the fuchsia color extends further, filling out a larger shape.<END_STEP_2>\n<STEP_3>
+THOUGHT 3: Next, Task Demonstration 3. The input grid has <observation>red (2) and teal (8)</observation> cells.
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+Again, the black background becomes <observation>green</observation>. The teal shape is <observation>preserved</observation>. The red cell at <observation>(6,5)</observation> is adjacent to the teal cell at <observation>(5,5)</observation>. In the output, (6,5) becomes <observation>teal</observation>, and the teal color is extended to <observation>(7,5)</observation> and also to connect with the teal cells at <observation>(4,3), (4,4), (4,5)</observation>, forming a larger <observation>connected teal shape that appears symmetric</observation>.<END_STEP_3>\n<STEP_4>
+THOUGHT 4: Finally, Task Demonstration 4. The input grid contains <observation>red (2) and yellow (4)</observation> cells.
+<abs_vis_token></abs_vis_token>
+The corresponding output grid is:
+<abs_vis_token></abs_vis_token>
+The pattern continues: black cells become <observation>green</observation>. The original yellow cells are <observation>maintained</observation>. The red cells turn yellow and cause the yellow shape to expand symmetrically. For instance, the red cell at <observation>(3,5)</observation> adjacent to <observation>yellow (3,4)</observation> makes <observation>(3,5) yellow</observation> and extends <observation>yellow to (3,6)</observation>. This creates a continuous yellow bar. The red cells at <observation>(4,5)</observation> and <observation>(5,5)</observation> similarly extend the yellow shape.<END_STEP_4>\n<STEP_5>
+THOUGHT 5: Now I will apply the observed general transformation pattern to Test Input 1. The input grid is:
+<abs_vis_token></abs_vis_token>
+The input contains blue (1) cells at <observation>(3,4), (4,4), (4,5), and (5,5)</observation>. Red (2) cells are at <observation>(4,6) and (5,6)</observation>.
+Based on the patterns observed:
+1. All black (0) cells will become green (3) in the output.
+2. The original blue cells will retain their color. So, output cells (3,4), (4,4), (4,5), and (5,5) will be blue.
+3. Consider the red cell at (4,6). It's adjacent to the blue cell at (4,5). Thus, in the output, cell (4,6) will become blue. The symmetric extension rule implies that the cell on the other side of (4,6) from (4,5), which is (4,7), will also become blue.
+4. Consider the red cell at (5,6). It's adjacent to the blue cell at (5,5). Thus, in the output, cell (5,6) will become blue. The provided solution indicates that the symmetric extension to (5,7) does not turn blue but remains green. This is a specific behavior similar to what was observed in Demo 1 where not all potential reflections occurred.
+5. The blue cell at (3,4) in the input appears to gain a symmetric counterpart at (3,7) in the output. This suggests a reflection across a vertical axis (around x=5.5), likely influenced by the overall symmetric pattern being formed by the other transformations involving red cells.
+Combining these transformations, the predicted output grid should be:
+<abs_vis_token></abs_vis_token>
+This visual output corresponds to the matrix provided in the final answer.
+<END_STEP_5>\n\n\n"""
+    },
+    "Zebra_CoT_tetris": {
+        "sys_prompt": ALIGN_SYS_PROMPT_exact,
+        "examples": 
+        """
+Here is an example:
+## Input: Fill the exact red shape shown in the question grid. Choose the only option set whose pieces perfectly tile the shape without gaps or overlap.
+<STEP_0>
+THOUGHT 0: The problem asks to find which set of pieces from the options can perfectly fill the given red shape. I need to examine the shape and the pieces in each option.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Let's isolate the red shape from the grid to better visualize its form and count the number of cells it occupies.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: The isolated red shape is shown. It occupies 14 cells. Now I need to check the options to find a set of pieces that also totals 14 cells and can fit into this shape.<END_STEP_2>
+<STEP_3>
+THOUGHT 3: Option A contains three pieces. Let's test if these pieces can tile the red shape. I will start by placing the first piece.
+<abs_vis_token></abs_vis_token><END_STEP_3>
+<STEP_4>
+THOUGHT 4: The first piece from option A has been placed, covering part of the red shape. Now I will place the second piece from option A.
+<abs_vis_token></abs_vis_token><END_STEP_4>
+<STEP_5>
+THOUGHT 5: The second piece is now placed, filling more of the shape. Let's place the third and final piece from option A.
+<abs_vis_token></abs_vis_token><END_STEP_5>
+<STEP_6>
+THOUGHT 6: All three pieces from Option A have been placed and they perfectly tile the red shape without any gaps or overlaps.<END_STEP_6>
+<STEP_7>
+THOUGHT 7: Since the pieces in Option A perfectly fit the red shape, Option A is the correct solution.<END_STEP_7>
+
+
+## Your output: Fill the exact red shape shown in the question grid. Choose the only option set whose pieces perfectly tile the shape without gaps or overlap.
+<STEP_0>
+THOUGHT 0: The problem asks to find which set of pieces from the options can perfectly fill the given red shape. I need to examine the shape and the pieces in each option.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Let's isolate the red shape from the grid to better visualize its form and count the number of cells it occupies.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: The isolated red shape is shown. It occupies <observation>14 cells</observation>. Now I need to check the options to find a set of pieces that also totals 14 cells and can fit into this shape.<END_STEP_2>
+<STEP_3>
+THOUGHT 3: Option A contains three pieces. Let's test if these pieces can tile the red shape. I will start by placing the first piece.
+<abs_vis_token></abs_vis_token><END_STEP_3>
+<STEP_4>
+THOUGHT 4: The first piece from option A has been placed, covering part of the <observation>red shape</observation>. Now I will place the second piece from option A.
+<abs_vis_token></abs_vis_token><END_STEP_4>
+<STEP_5>
+THOUGHT 5: The second piece is now placed, filling more of the shape. Let's place the third and final piece from option A.
+<abs_vis_token></abs_vis_token><END_STEP_5>
+<STEP_6>
+THOUGHT 6: All three pieces from Option A have been placed and they perfectly tile the red shape without any gaps or overlaps.<END_STEP_6>
+<STEP_7>
+THOUGHT 7: Since the pieces in Option <observation>A</observation> perfectly fit the red shape, Option A is the correct solution.<END_STEP_7>
+
+
+
+"""
+    },
+    "Zebra_CoT_rpm": {
+        "sys_prompt": ALIGN_SYS_PROMPT_exact,
+        "examples": 
+        """
+Here is an example:
+## Input: What image should replace the question mark in the 3x3 grid, based on the patterns observed in the provided matrix and answer options?
+<STEP_0>
+THOUGHT 0: The problem requires identifying patterns in the visual elements within the grid, specifically the outer frame and the inner shape and color.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Observing the answer options provided, there is a consistent outer shape. Let's isolate this common outer boundary.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: The outer shape is a hexagon. Next, analyze the inner patterns in the problem grid. The third column consistently contains a circle. The color of the inner shape appears to follow a pattern based on the grid position: black for even row+column sum, grey for odd sum. For cell (3,3), the sum is 6 (even), suggesting a black inner shape. Combining these, the missing image should have a black circle inside a hexagon.
+<abs_vis_token></abs_vis_token><END_STEP_2>
+<STEP_3>
+THOUGHT 3: The generated visual confirms the predicted outer hexagon and inner black circle. Comparing this pattern to the answer choices, option 5 displays a hexagon with a black circle inside.<END_STEP_3>
+
+
+## Your output: What image should replace the question mark in the 3x3 grid, based on the patterns observed in the provided matrix and answer options?
+<STEP_0>
+THOUGHT 0: The problem requires identifying patterns in the visual elements within the grid, specifically the outer frame and the inner shape and color.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Observing the answer options provided, there is a consistent outer shape. Let's isolate this common outer boundary.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: The outer shape is a <observation>hexagon</observation>. Next, analyze the inner patterns in the problem grid. The <observation>third column</observation> consistently contains a <observation>circle</observation>. The color of the inner shape appears to follow a pattern based on the grid position: <observation>black for even row+column sum, grey for odd sum</observation>. For cell <observation>(3,3)</observation>, the sum is <observation>6 (even)</observation>, suggesting a <observation>black inner shape</observation>. Combining these, the missing image should have a black circle inside a hexagon.
+<abs_vis_token></abs_vis_token><END_STEP_2>
+<STEP_3>
+THOUGHT 3: The generated visual confirms the predicted <observation>outer hexagon and inner black circle</observation>. Comparing this pattern to the answer choices, option <observation>5</observation> displays a hexagon with a black circle inside.<END_STEP_3>
+"""
+    },
+    "Zebra_CoT_checkers": {
+        "sys_prompt": ALIGN_SYS_PROMPT_exact,
+        "examples": 
+        """
+Here is an example:
+## Input: How can Black play optimally for the next 5 moves from this state (ending with their move)?
+<STEP_0>
+THOUGHT 0: The problem asks for Black's optimal play for the next 5 moves. This means we need to determine the best sequence of moves for Black and the likely responses from Red, covering 3 Black moves and 2 Red moves.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Black's first move is from (1,0) to (2,1). This move develops the piece towards the center and prepares for future actions.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: Red responds by moving from (5,0) to (4,1). This move also brings a Red piece forward.
+<abs_vis_token></abs_vis_token><END_STEP_2>
+<STEP_3>
+THOUGHT 3: Black's second move is a capture, moving from (3,0) to (5,2). This captures the Red piece at (4,1).
+<abs_vis_token></abs_vis_token><END_STEP_3>
+<STEP_4>
+THOUGHT 4: Red responds with a capture, moving from (6,3) to (4,1). This captures the Black piece at (5,2).
+<abs_vis_token></abs_vis_token><END_STEP_4>
+<STEP_5>
+THOUGHT 5: Black's third move is from (2,1) to (3,2). This move repositions the piece after the exchange. This completes Black's 3rd move, totaling 5 moves in the sequence.
+<abs_vis_token></abs_vis_token><END_STEP_5>
+
+
+## Your output: How can Black play optimally for the next 5 moves from this state (ending with their move)?
+<STEP_0>
+THOUGHT 0: The problem asks for Black's optimal play for the next 5 moves. This means we need to determine the best sequence of moves for Black and the likely responses from Red, covering 3 Black moves and 2 Red moves.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Black's first move is from (1,0) to (2,1). This move develops the piece towards the center and prepares for future actions.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: Red responds by moving from <observation>(5,0) to (4,1)</observation>. This move also brings a Red piece forward.
+<abs_vis_token></abs_vis_token><END_STEP_2>
+<STEP_3>
+THOUGHT 3: Black's second move is a capture, moving from <observation>(3,0) to (5,2)</observation>. This captures the Red piece at <observation>(4,1)</observation>.
+<abs_vis_token></abs_vis_token><END_STEP_3>
+<STEP_4>
+THOUGHT 4: Red responds with a capture, moving <observation>from (6,3) to (4,1)</observation>. This captures the Black piece at <observation>(5,2)</observation>.
+<abs_vis_token></abs_vis_token><END_STEP_4>
+<STEP_5>
+THOUGHT 5: Black's third move is from <observation>(2,1) to (3,2)</observation>. This move repositions the piece after the exchange. This completes Black's 3rd move, totaling 5 moves in the sequence.
+<abs_vis_token></abs_vis_token><END_STEP_5>
+
+
+
+"""
+    },
+    "Zebra_CoT_connect_four": {
+        "sys_prompt": ALIGN_SYS_PROMPT_exact,
+        "examples": 
+        """
+Here is an example:
+## Input: How does Yellow win this game?
+<STEP_0>
+THOUGHT 0: The problem asks for Yellow's winning strategy from the given board state. However, the provided reasoning trace appears to depict a different game sequence. We will follow the steps shown in the reasoning trace to demonstrate a winning sequence for Yellow as implied by the trace. The trace begins with Yellow making a move on what appears to be an empty or partially filled board, distinct from the initial problem image.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Following the raw trace, Yellow makes the first move by playing a disc into column 1. This establishes Yellow's presence in a key column on the board.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: Red responds by playing a disc into column 7. This move occupies a position on the opposite side of the board.
+<abs_vis_token></abs_vis_token><END_STEP_2>
+<STEP_3>
+THOUGHT 3: Yellow plays again in column 1, stacking a second yellow disc on top of the first one. This builds a vertical structure, threatening a potential vertical or diagonal win later in the game.
+<abs_vis_token></abs_vis_token><END_STEP_3>
+<STEP_4>
+THOUGHT 4: Red plays a disc into column 2. This move by Red aims to control a central column or block potential diagonal threats from Yellow's pieces in columns 1 and 3.
+<abs_vis_token></abs_vis_token><END_STEP_4>
+<STEP_5>
+THOUGHT 5: Yellow plays a disc into column 7, stacking on Red's disc. This move contests control of column 7 and could be part of a strategy to build a vertical or diagonal threat on the right side of the board.
+<abs_vis_token></abs_vis_token><END_STEP_5>
+<STEP_6>
+THOUGHT 6: Red plays a disc into column 6. This move occupies a position next to column 7 and prepares for potential connections in the center-right area.
+<abs_vis_token></abs_vis_token><END_STEP_6>
+<STEP_7>
+THOUGHT 7: Yellow plays a disc into column 6, stacking on Red's disc. This move completes a horizontal line of four yellow discs in the bottom row, securing the win for Yellow. Specifically, this move connects Yellow discs in columns 3, 4, 5, and 6 in the bottom row.
+<abs_vis_token></abs_vis_token><END_STEP_7>
+
+## Your output: How does Yellow win this game?
+<STEP_0>
+THOUGHT 0: The problem asks for Yellow's winning strategy from the given board state. However, the provided reasoning trace appears to depict a different game sequence. We will follow the steps shown in the reasoning trace to demonstrate a winning sequence for Yellow as implied by the trace. The trace begins with Yellow making a move on what appears to be an empty or partially filled board, distinct from the initial problem image.<END_STEP_0>
+<STEP_1>
+THOUGHT 1: Following the raw trace, Yellow makes the first move by playing a disc into column 1. This establishes Yellow's presence in a key column on the board.
+<abs_vis_token></abs_vis_token><END_STEP_1>
+<STEP_2>
+THOUGHT 2: Red responds by <observation>playing a disc into column 7</observation>. This move occupies a position on the opposite side of the board.
+<abs_vis_token></abs_vis_token><END_STEP_2>
+<STEP_3>
+THOUGHT 3: Yellow plays again in <observation>column 1, stacking a second yellow disc on top of the first one.</observation> This builds a vertical structure, threatening a potential vertical or diagonal win later in the game.
+<abs_vis_token></abs_vis_token><END_STEP_3>
+<STEP_4>
+THOUGHT 4: Red plays a disc into <observation>column 2</observation>. This move by Red aims to control a central column or block potential diagonal threats from Yellow's pieces in columns 1 and 3.
+<abs_vis_token></abs_vis_token><END_STEP_4>
+<STEP_5>
+THOUGHT 5: Yellow plays a disc into <observation>column 7</observation>, stacking on Red's disc. This move contests control of column 7 and could be part of a strategy to build a vertical or diagonal threat on the right side of the board.
+<abs_vis_token></abs_vis_token><END_STEP_5>
+<STEP_6>
+THOUGHT 6: Red plays a disc into <observation>column 6</observation>. This move occupies a position next to column 7 and prepares for potential connections in the center-right area.
+<abs_vis_token></abs_vis_token><END_STEP_6>
+<STEP_7>
+THOUGHT 7: Yellow plays a disc into <observation>column 6, stacking on Red's disc</observation>. This move completes <observation>a horizontal line of four yellow discs in the bottom row</observation>, securing the win for Yellow. Specifically, this move connects Yellow discs in columns 3, 4, 5, and 6 in the bottom row.
+<abs_vis_token></abs_vis_token><END_STEP_7>
+"""
+    },
 }
