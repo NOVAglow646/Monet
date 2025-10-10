@@ -1120,9 +1120,8 @@ elif args.stage in ['avt_v5_stage1','avt_v5_stage2']:
     setattr(training_args, 'alignment_weight', args.alignment_weight)
     setattr(training_args, 'gradient_checkpointing_kwargs', {"use_reentrant": False})
     setattr(training_args, 'latent_size', args.latent_size)
-    setattr(training_args, 'emphasize_latent_weight', args.emphasize_latent_weight)
-    setattr(training_args, 'teacher_reps_dir', args.teacher_reps_dir)
-    setattr(training_args, 'no_ce', args.no_ce)
+    setattr(training_args, 'teacher_latent_dir', args.teacher_latent_dir)
+
     setattr(training_args, 'image_resize', args.image_resize)
 
 # Initialize the trainer (callbacks that need trainer instance will be added after)

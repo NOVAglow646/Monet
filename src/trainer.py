@@ -1644,9 +1644,11 @@ class CustomTrainerAVT_V5_Stage2(SFTTrainer):
         Compute training loss for AVT v5 stage2 with optional cached teacher latents.
         """
         # Try to load precomputed teacher latents
-        teacher_latents = load_offline_tensor(self.teacher_reps_dir, batch_metadata=inputs['metadata'], alignment_layer=self.args.alignment_layer)
+        teacher_latents = load_offline_tensor(self.teacher_latent_dir, batch_metadata=inputs['metadata'], alignment_layer=self.args.alignment_layer)
 
         # Student alignment forward
+
+        
         inputs['latent_mode'] = True
         inputs['input_ids'] = inputs['student_input_ids']
         inputs['attention_mask'] = inputs['student_attention_mask']
@@ -1682,10 +1684,6 @@ class CustomTrainerAVT_V5_Stage2(SFTTrainer):
             self.observation_token_acc_step += 1
         alignment_loss = student_outputs.loss_dict['alignment']
 
-        if isinstance(self.weight, torch.Tensor):
-            self.weight = self.weight.to(student_ce_loss.device, dtype=student_ce_loss.dtype)
-        else:
-            self.weight = student_ce_loss.new_tensor(float(self.weight))
         loss = student_ce_loss + self.weight * alignment_loss
 
         outputs_student_loss = student_ce_loss.item()
