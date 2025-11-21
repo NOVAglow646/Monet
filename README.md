@@ -22,8 +22,8 @@
     <a href="https://huggingface.co/datasets/NOVAglow646/Monet-SFT-125K" target="_blank" rel="noopener noreferrer">
       <img src="https://img.shields.io/badge/Dataset-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=black" alt="HF Dataset">
     </a>
-    <a href="https://huggingface.co/spaces/Agents-X/PyVision" target="_blank">
-    <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Demo-PyVision-ffc107?color=ffc107&logoColor=white" height="20" />
+    <a href="https://huggingface.co/datasets/NOVAglow646/Monet-SFT-125K" target="_blank">
+    <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Model-Monet7B-ffc107?color=ffc107&logoColor=white" height="20" />
 </a>
 
   </p>
