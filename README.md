@@ -18,14 +18,14 @@
       <img src='https://img.shields.io/badge/Paper-PDF-red?style=flat&logo=arXiv&logoColor=red' alt='Paper PDF'>
     </a>
     <a href="https://huggingface.co/NOVAglow646/Monet-7B" target="_blank" rel="noopener noreferrer">
-      [![hf_space](https://img.shields.io/badge/🤗-Open%20In%20Spaces-blue.svg)](https://huggingface.co/qijimrc/CogCoM)
+      <img src="https://img.shields.io/badge/Model-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=white" alt="HF Model">
     </a>
     <a href="https://huggingface.co/datasets/YourOrg/YourDataset" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/badge/Dataset-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=white" alt="HF Dataset">
+      <img src="https://img.shields.io/badge/Dataset-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=black" alt="HF Dataset">
     </a>
   </p>
 </p>
-
+[![hf_space](https://img.shields.io/badge/🤗-Open%20In%20Spaces-blue.svg)](https://huggingface.co/qijimrc/CogCoM)
 
 
 
