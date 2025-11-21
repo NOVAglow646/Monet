@@ -17,8 +17,9 @@
     <a href="https://www.arxiv.org/abs/2506.17218">
       <img src='https://img.shields.io/badge/Paper-PDF-red?style=flat&logo=arXiv&logoColor=red' alt='Paper PDF'>
     </a>
-    <a href="https://huggingface.co/NOVAglow646/Monet-7B" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/badge/Model-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=white" alt="HF Model">
+    <a href="https://huggingface.co/NOVAglow646/Monet-7B">
+      <img src="https://huggingface.co/front/assets/huggingface_logo.svg" height="20" />
+      Monet-7B
     </a>
     <a href="https://huggingface.co/datasets/NOVAglow646/Monet-SFT-125K" target="_blank" rel="noopener noreferrer">
       <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Dataset-Monet-SFT-125K-ffc107?color=ffc107&logoColor=white" height="20" />
