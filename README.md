@@ -27,8 +27,7 @@
 
 
 [![arXiv](https://img.shields.io/badge/arXiv-PyVision-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org)
-[![Model](https://img.shields.io/badge/Demo-Monet7B-yellow?style=flat&logo=huggingface)](https://huggingface.co/NOVAglow646/Monet-7B)
-
+[![Model](https://img.shields.io/badge/Demo-Monet7B-yellow?style=flat&logo=https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/huggingface_logo.svg)](https://huggingface.co/NOVAglow646/Monet-7B)
 
 
 <p align="center">
