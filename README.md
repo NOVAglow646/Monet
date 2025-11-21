@@ -1,7 +1,6 @@
 <p align="center">
   <h1 align="center">Monet: Reasoning in Latent Visual Space Beyond Images and Language</h1>
   <p align="center">
-    arXiv 2025
   </p>
   <p align="center">
     <a href="https://novaglow646.github.io/">Qixun Wang</a>,
@@ -18,10 +17,10 @@
       <img src='https://img.shields.io/badge/Paper-PDF-red?style=flat&logo=arXiv&logoColor=red' alt='Paper PDF'>
     </a>
     <a href="https://huggingface.co/NOVAglow646/Monet-7B" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/badge/Model-HuggingFace-FFD21E?style=flat&logo=huggingface" alt="HF Model">
+      <img src="https://img.shields.io/badge/Model-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=orange" alt="HF Model">
     </a>
     <a href="https://huggingface.co/datasets/YourOrg/YourDataset" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/badge/Dataset-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=black" alt="HF Dataset">
+      <img src="https://img.shields.io/badge/Dataset-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=orange" alt="HF Dataset">
     </a>
   </p>
 </p>
