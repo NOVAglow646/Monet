@@ -5,7 +5,7 @@ new/precomputed_teacher_reps/
 checkpoints/
 sft_analysis/
 logs/
-
+scripts/
 
 wandb
 
