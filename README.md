@@ -17,14 +17,11 @@
       <img src='https://img.shields.io/badge/Paper-PDF-red?style=flat&logo=arXiv&logoColor=red' alt='Paper PDF'>
     </a>
     <a href="https://huggingface.co/NOVAglow646/Monet-7B" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/badge/Model-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=orange" alt="HF Model">
-    </a>
-    <a href="https://huggingface.co/datasets/NOVAglow646/Monet-SFT-125K" target="_blank" rel="noopener noreferrer">
-      <img src="https://img.shields.io/badge/Dataset-HuggingFace-FFD21E?style=flat&logo=huggingface&logoColor=black" alt="HF Dataset">
+      <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Model-Monet7B-ffc107?color=ffc107&logoColor=white" height="20" />
     </a>
     <a href="https://huggingface.co/datasets/NOVAglow646/Monet-SFT-125K" target="_blank">
-    <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Model-Monet7B-ffc107?color=ffc107&logoColor=white" height="20" />
-</a>
+    <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Model-MonetSFT125K-ffc107?color=ffc107&logoColor=white" height="20" />
+    </a>
 
   </p>
 </p>
@@ -76,55 +73,14 @@ cd Monet
 pip install -r requirements.txt
 ```
 
-## Data Preparation
-We provide a sample dataset of 100 examples for the VSP spatial reasoning task. Please format your data file as follows:
 
-```json
-{
-    "text_input": "Question",
-    "text_output": "Answer",
-    "image_input": ["input1.jpg"],
-    "image_output": "helper_image.jpg"
-}
-```
 
 ## Training
-We train our model in two stages:
-- Stage 1 jointly supervises text and latent visual tokens, grounding the latter in the visual subspace.
-- Stage 2 drops the latent supervision, anchoring the grounded latent tokens for subsequent text generation.
+The training requires a modification of the official code of Qwen2.5-VL-7B, which is implemented in `new/avt_qwen_model/modeling_qwen2_5_vl_avt.py`. The main implementation of the forward process with latent embeddings is in `Qwen2_5_VLModel:forward` and `Qwen2_5_VLForConditionalGeneration:forward`.
 
-<p align="center">
-    <img src="asset/pipeline.png" alt="Logo" width="190%">
-</p>
 
-Run the following commands to reproduce the training. Make sure to configure the `data_path` and `model_path` as needed.
-
-**Training Stage 1**
-```bash
-python src/main.py \
-    --model Qwen/Qwen2.5-VL-7B-Instruct --epochs 10 \
-    --task vsp-spatial-reasoning \
-    --latent_size 4 \
-    --stage stage1 \
-    --data_path ./data/sample.jsonl \
-    --log_file ./log.txt \
-    --save_model_path ./checkpoints/model_stage1 
-```
-
-**Training Stage 2**
-```bash
-python src/main.py \
-    --model Qwen/Qwen2.5-VL-7B-Instruct --epochs 10 \
-    --task vsp-spatial-reasoning \
-    --latent_size 4 \
-    --stage stage2 \
-    --data_path ./data/sample.jsonl \
-    --log_file ./log.txt \
-    --load_model_path ./checkpoints/model_stage1
-    --save_model_path ./checkpoints/model_stage2 
-```
-
-<!-- ## Inference -->
+## Inference
+The inference requires replacing the official code of vLLM.
 
 
 ## Citation
@@ -142,11 +98,3 @@ If you find our work useful, please consider citing:
 }
 ```
 
-## Acknowledgement
-We would like to thank the following works for their code and models:
-- Training: [Coconut](https://arxiv.org/abs/2412.06769), [Qwen](https://huggingface.co/Qwen) and [MVoT](https://arxiv.org/pdf/2501.07542)
-- Datasets: [VSP](https://arxiv.org/abs/2407.01863), [Blink](https://zeyofu.github.io/blink/), [COMT](https://arxiv.org/abs/2412.12932) and [SAT](https://arxiv.org/abs/2412.07755)
-
-We are extremely grateful to Haoyu Zhen, Bairu Hou, Guangtao Zeng, Yuncong Yang,
-Jiaben Chen, Ziwei Liu, Zonghan Yang, Sunli Chen, Lixing Fang, and many other friends in our [Embodied AGI Lab](https://embodied-agi.cs.umass.edu/)
-for their helpful feedback and insightful discussions.

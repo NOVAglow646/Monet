@@ -37,13 +37,13 @@ def get_args():
     parser.add_argument("--shuffle_train", action='store_true', default=False, help="Whether to shuffle the training dataset.")
 
     # ===== Monet arguments =====
-    parser.add_argument("--alignment", type=str, default="observation_all", choices=["observation_end", "boxed_start", "observation_all"], help="The alignment strategy for AVT.")
+    parser.add_argument("--alignment", type=str, default="observation_all", choices=["observation_end", "boxed_start", "observation_all"], help="The alignment strategy for Monet.")
     parser.add_argument("--latent_size", type=int, default=4)
     parser.add_argument("--ce_emphasize_factor", default=1.0, type=float)
     parser.add_argument("--only_predict_obs", action='store_true', default=False)
-    parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in avt_stage1.", type=float)
+    parser.add_argument("--alignment_weight", default=1.0, help="Weight of the alignment loss in SFT Stage 2 and SFT Stage 3.", type=float)
     parser.add_argument("--alignment_layer", choices=["all_layers", "last_layer"])
-    parser.add_argument("--emphasize_latent_weight", default=1.0, type=float, help="Weight of the loss that only flow through latents in avt_v3.")
+    parser.add_argument("--emphasize_latent_weight", default=1.0, type=float, help="Weight of the loss that only flow through latents in SFT Stage 2.")
     parser.add_argument("--sft_stage2_align_poss", default='obs', choices=['obs', 'latent_end'])
     parser.add_argument("--sft_stage2_global_img_tokens", type=int, help="Maximum img pixels in a sequence will be sft_stage2_global_max_img_tokens*28*28", default=1500)
     parser.add_argument("--sft_stage2_per_img_tokens", type=int, help="Maximum pixels per img will be sft_stage2_global_max_img_tokens*28*28", default=1280)
@@ -191,7 +191,7 @@ def find_ids_poss(input_ids: torch.Tensor, answer_start_token_pattern: torch.Ten
             start_idx = find_subsequence(input_ids[i], ids_tensor_or_list, start_idx+1)
             if start_idx != -1:
                 manipulation_result_poss.append(start_idx)
-        manipulation_result_poss = manipulation_result_poss[:] # remove the first '\\boxed{', which is from the direct answer without avt
+        manipulation_result_poss = manipulation_result_poss[:]
         batch_poss.append(manipulation_result_poss)
     return batch_poss
     

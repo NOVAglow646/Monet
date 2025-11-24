@@ -4,7 +4,7 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 import shutil
 from functools import partial
 import torch
-from new.avt_qwen_model import apply_qwen2_5_avt
+from new.monet_qwen_model import apply_qwen2_5_monet
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLConfig, AutoTokenizer, AutoProcessor
 from PIL import Image
 import logging
@@ -80,8 +80,6 @@ try:
 except Exception:
     pass
 
-if args.stage in ['stage1', 'avt_stage1'] or (args.stage == 'sft_stage1' and args.sft_analysis_enable):
-    config.output_hidden_states = True
 
 # Prefer Trainer-managed device placement (DDP/Accelerate). Avoid device_map="auto" here.
 # Enable TF32 for faster matmul on Ampere+ if available.
@@ -97,10 +95,6 @@ model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
     torch_dtype=torch.bfloat16,
 )
 
-if args.stage in ['stage1', 'sft_stage1', 'avt_stage1']: 
-    new_vocab_size = len(processor.tokenizer)
-    model.resize_token_embeddings(new_vocab_size)
-    model.config.vocab_size = new_vocab_size
 
 tokenizer = processor.tokenizer
 
@@ -333,10 +327,7 @@ if args.shuffle_train:
 train_dataset = []
 cur_max = -1
 for i, sample in tqdm(enumerate(all_train_dataset[:]), desc="Collecting training data and length check...", total=len(all_train_dataset)):
-    if 'avt' in args.stage:
-        processed = preprocess_function(sample, dataset_root=args.dataset_root, allow_no_observation=args.allow_no_observation)
-    else:
-        processed = preprocess_function(sample)
+    processed = preprocess_function(sample, dataset_root=args.dataset_root, allow_no_observation=args.allow_no_observation)
     if processed is not None:
         train_dataset.append(processed)
 
@@ -393,7 +384,7 @@ training_args = SFTConfig(
     bf16=True,
     push_to_hub=False,
     remove_unused_columns=False,
-    gradient_checkpointing=gradient_checkpointing, #False if args.stage == "avt_stage1" else True,
+    gradient_checkpointing=gradient_checkpointing,
     dataset_text_field="",
     dataset_kwargs={"skip_prepare_dataset": True},
     report_to=['wandb'] if args.wandb_name is not None else [],

@@ -8,7 +8,7 @@ os.environ["ABS_VIS_START_ID"] = "151666"
 os.environ["ABS_VIS_END_ID"] = "151667"
 try:
     # Import your patched runner by module name
-    patched = importlib.import_module("new.avt_qwen_model.vllm.avt_gpu_model_runner")
+    patched = importlib.import_module("new.monet_qwen_model.vllm.monet_gpu_model_runner")
     for key in (
         "vllm.v1.worker.gpu_model_runner",
         "vllm.worker.gpu_model_runner",
@@ -16,6 +16,6 @@ try:
     ):
         sys.modules[key] = patched
 
-    print("[AVT] vLLM runner patched via sitecustomize:", __file__)
+    print("[Monet] vLLM runner patched via sitecustomize:", __file__)
 except Exception as e:
-    print("[AVT] sitecustomize failed:", repr(e))
+    print("[Monet] sitecustomize failed:", repr(e))

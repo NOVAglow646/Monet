@@ -11,6 +11,9 @@ import math
 from time import time
 
 def compute_latents_only_loss(latents, loss_for_latents):
+    '''
+    Compute a loss (`loss_for_latents`) that backpropagates only through the latent embeddings `latents`.
+    '''
     def _flatten_tensors(x):
                 # Flatten nested [list/tuple of Tensors] into a flat list of Tensors
                 if isinstance(x, (list, tuple)):
@@ -41,8 +44,10 @@ def compute_latents_only_loss(latents, loss_for_latents):
     return proxy_loss
 
 def load_offline_tensor(tensor_dir, batch_metadata, alignment_layer="all_layers", rep_type="rep", v5_s1_align_poss="obs"):
+    '''
+    Load precomputed teacher representations (observation tokens for the alignment in SFT stage 2 or the latent embeddings for SFT stage 3)
+    '''
     teacher_reps = None
-    teacher_ce_loss = None
     latents_list = []
     for metadata in batch_metadata:
         dataset_name = metadata['dataset_name']
@@ -61,6 +66,8 @@ def load_offline_tensor(tensor_dir, batch_metadata, alignment_layer="all_layers"
     if batch_metadata is not None and len(latents_list) == len(batch_metadata):
         teacher_reps = latents_list
     return teacher_reps
+
+
 class CustomTrainerSFT_STAGE1(SFTTrainer):
     def __init__(self, *args, **kwargs):
         self.exp_name =kwargs.pop('exp_name')
@@ -148,20 +155,23 @@ class CustomTrainerSFT_STAGE2(SFTTrainer):
         """
         Compute training loss and additionally compute token accuracies
         """
-        inputs['stage'] = 'avt_v5_stage1'
+        # ------------------------------------------------------------------
+        # Latent forward to get ce_patch_pos (positions of latent embeddings) and ce_patch_vec (latent embeddings).
+        # Multiple forward is needed since we need to autoregressively generate latents.
+        # ------------------------------------------------------------------
         inputs['latent_mode'] = True
         inputs['loss_type'] = []
-        #inputs['enable_ce_checkpoint'] = False
-        model.gradient_checkpointing_disable()
+        model.gradient_checkpointing_disable() # since we set use_cache=True in latent forward, we must disable grad checkpointing
         outputs = model(**inputs, return_dict=True, output_hidden_states=False)
         
+        # ------------------------------------------------------------------
+        # Insert the collected latent embeddings into the latent positions, and forward once.
+        # ------------------------------------------------------------------
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
-
         inputs['latent_mode'] = False
         inputs['ce_patch_pos'] = outputs.ce_patch_pos
         inputs['ce_patch_vec'] = outputs.ce_patch_vec
         inputs['ce_emphasize_poss'] = inputs['observation_poss']
-        # Dynamic warmup factor passed to model.forward
         inputs['ce_emphasize_factor'] = self.ce_emphasize_factor
         inputs['loss_type'] = ['ce']
         if self.args.alignment_weight != 0:
@@ -171,8 +181,9 @@ class CustomTrainerSFT_STAGE2(SFTTrainer):
         # Ensure training forward does NOT request attentions (prevents checkpoint recompute mismatch)
         inputs.pop('output_attentions', None)
         inputs.pop('attn_analysis', None)
-        #inputs.pop('attention_mask_4d')
+
         if self.args.alignment_weight != 0:
+            # Load precomputed teacher representations of observation tokens for alignment loss
             teacher_reps = load_offline_tensor(self.args.teacher_reps_dir, batch_metadata=inputs['metadata'], 
             alignment_layer=self.args.alignment_layer, v5_s1_align_poss=self.args.v5_s1_align_poss)
             if self.args.v5_s1_align_poss == 'obs':
@@ -180,6 +191,7 @@ class CustomTrainerSFT_STAGE2(SFTTrainer):
             elif self.args.v5_s1_align_poss == 'latent_end':
                 inputs['alignment_poss'] = inputs['latent_end_poss']
             inputs['teacher_hidden_states_for_alignment'] = teacher_reps
+
         teacher_ce_loss, teacher_output = super().compute_loss(
                 model, 
                 inputs,
@@ -187,7 +199,7 @@ class CustomTrainerSFT_STAGE2(SFTTrainer):
             )
         
         alignment_loss = teacher_output.loss_dict.get('alignment', torch.tensor(0.0))
-        if self.args.emphasize_latent_weight != 1.0 and alignment_loss.item() != 0.0:
+        if self.args.emphasize_latent_weight != 0.0 and alignment_loss.item() != 0.0: # latent-only backpropagation for alignment loss
             latent_only_loss = compute_latents_only_loss(outputs.ce_patch_vec, self.args.alignment_weight * alignment_loss)
             loss = self.args.emphasize_latent_weight * latent_only_loss + teacher_ce_loss
         else:
@@ -248,7 +260,7 @@ class CustomTrainerSFT_STAGE3(SFTTrainer):
         # Where to read precomputed teacher latents
         self.teacher_latent_dir = getattr(self.args, 'teacher_latent_dir', None)
         if not self.teacher_latent_dir:
-            raise ValueError("teacher_latent_dir must be specified for AVT_V5_Stage2")
+            raise ValueError("teacher_latent_dir must be specified for SFT Stage 3")
 
         self.observation_token_acc = 0.
         self.observation_token_acc_step = 0
@@ -259,10 +271,14 @@ class CustomTrainerSFT_STAGE3(SFTTrainer):
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
-        Compute training loss for AVT v5 stage2 with optional cached teacher latents.
+        Compute training loss for SFT stage3 with optional cached teacher latents.
         """
+        # Load precomputed teacher latents
         teacher_latents = load_offline_tensor(self.teacher_latent_dir, batch_metadata=inputs['metadata'], alignment_layer=self.args.alignment_layer, rep_type="latent")
 
+        # ------------------------------------------------------------------
+        # Latent forward to get ce_patch_pos (positions of latent embeddings) and ce_patch_vec (latent embeddings)
+        # ------------------------------------------------------------------
         inputs['latent_mode'] = True
         inputs['input_ids'] = inputs['student_input_ids']
         inputs['attention_mask'] = inputs['student_attention_mask']
@@ -272,7 +288,7 @@ class CustomTrainerSFT_STAGE3(SFTTrainer):
             inputs.pop('labels')
         inputs['alignment_poss'] = inputs['student_alignment_poss']
         inputs['teacher_hidden_states_for_alignment'] = teacher_latents
-        model.gradient_checkpointing_disable()
+        model.gradient_checkpointing_disable() # since we set use_cache=True in latent forward, we must disable grad checkpointing
         inputs['loss_type'] = []
         inputs['output_hidden_states'] = False
         student_outputs_latent = model(**inputs)

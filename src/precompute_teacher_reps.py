@@ -16,7 +16,7 @@ _early_os.environ.setdefault("TORCH_NCCL_TRACE_BUFFER_SIZE", "1048576")  # enabl
 import shutil
 from functools import partial
 import torch
-from new.avt_qwen_model import apply_qwen2_5_avt
+from new.monet_qwen_model import apply_qwen2_5_monet
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLConfig, AutoTokenizer, AutoProcessor
 from PIL import Image
 import logging
@@ -54,10 +54,7 @@ if args.shuffle_train:
 train_dataset = []
 cur_max = -1
 for i, sample in tqdm(enumerate(all_train_dataset[:]), desc="Collecting training data and length check...", total=len(all_train_dataset)):
-    if 'avt' in args.stage:
-        processed = preprocess_function(sample, dataset_root=args.dataset_root)
-    else:
-        processed = preprocess_function(sample)
+    processed = preprocess_function(sample, dataset_root=args.dataset_root)
     if processed is not None:
         train_dataset.append(processed)
 
