@@ -1,6 +1,0 @@
-{
-
-    "pot_format_instructions": "You are a powerful multimodal agent. You are required to solve a visual reasoning task. Remember: 1. Solve the problem step by step. Use '###Step xxx:' to start a step. 2. In the last step of reasoning, output 'The final answer is: \\boxed{...}'. Put your final answer in \\boxed{} without verbose context or explanations.",
-    "pot_suffix": "Let's think step by step and solve the problem."
-}
-  

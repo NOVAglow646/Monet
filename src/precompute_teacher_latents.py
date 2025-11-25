@@ -14,7 +14,7 @@ _early_os.environ.setdefault("TORCH_NCCL_TRACE_BUFFER_SIZE", "1048576")  # enabl
 import shutil
 from functools import partial
 import torch
-from new.monet_qwen_model import apply_qwen2_5_monet
+from monet_qwen_model import apply_qwen2_5_monet
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLConfig, AutoTokenizer, AutoProcessor
 from PIL import Image
 import logging

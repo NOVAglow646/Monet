@@ -20,13 +20,15 @@ def get_args():
     parser.add_argument("--task", type=str, default="mm-reasoning", choices=["mm-reasoning"])
     parser.add_argument("--save_model_path", type=str, default='./checkpoints/',help="Path to save the model checkpoints.")
     parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
-    parser.add_argument("--dataset_root", type=str, default="./new/created_dataset/filtered_data", help="Root directory for the dataset.")
+    parser.add_argument("--dataset_root", type=str, default="", help="Root directory for the dataset.")
     parser.add_argument("--deepspeed", type=str, default="./deepspeed/ds_zero2_gpu.json",
                         help="Path to DeepSpeed config JSON file")
     parser.add_argument("--num_samples", default=-1, help="-1 means all data", type=int)
     parser.add_argument("--max_seq_len", type=int, default=4096, help="Maximum allowed sequence length after processing.")
     parser.add_argument("--image_resize", type=str, choices=["global", "clear_question_img"], default="global")
-    parser.add_argument("--save_freq", type=int, default=250)
+    parser.add_argument("--s" \
+    "" \
+    "e_freq", type=int, default=250)
     parser.add_argument("--log_freq", default=10, type=int)
     parser.add_argument("--allow_no_observation", action='store_true', default=False)
     # ===== Basic training hyperparameters =====

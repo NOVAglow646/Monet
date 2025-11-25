@@ -1,5 +1,0 @@
-{
-    "pot_format_instructions": "",
-    "pot_suffix": "<|user|>:\n{input}\n<|assistant|>: Let's think step by step and solve the problem with code."
-}
-  

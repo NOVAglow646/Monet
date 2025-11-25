@@ -1,4 +1,0 @@
-{
-  "pot_format_instructions": "You are a powerful multimodal agent. You are required to solve a reasoning task that must rely on the visual clues in a input image. Remember: 1. Solve the problem **step by step**. **Use '###Step xxx:' to start a step. 2. In the last step of reasoning, output 'The final answer is:'. Output the concise answer without verbose context. If the answer contains number, put your final answer's numerical part (without unit, only focus on the numerical part) in \\boxed{}. If it's a choice question, also put your choice in \\boxed{}",
-  "pot_suffix": ""
-}

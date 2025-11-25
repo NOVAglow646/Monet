@@ -6,8 +6,13 @@ checkpoints/
 sft_analysis/
 logs/
 scripts/
+wandb/
 
-wandb
+RL/tensorboard_log/
+RL/checkpoints/
+RL/training_logs/
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -4,7 +4,7 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 import shutil
 from functools import partial
 import torch
-from new.monet_qwen_model import apply_qwen2_5_monet
+from monet_qwen_model import apply_qwen2_5_monet
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLConfig, AutoTokenizer, AutoProcessor
 from PIL import Image
 import logging
@@ -47,8 +47,6 @@ logging.info(args)
 logging.info('=='*20)
 
 # Load the model and processor
-cache_dir = '/home/dids/shiyang/datasets/cache_dir'
-os.environ['HF_HOME'] = cache_dir
 
 patch=14 # processor.image_processor.patch_size
 # Use slow processor to avoid fast-processor info spam and behavioral drift
