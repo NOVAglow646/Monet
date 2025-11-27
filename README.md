@@ -169,15 +169,7 @@ We evalutate Monet-7B on [VLMEvalKit](https://github.com/open-compass/VLMEvalKit
 
 ## Citation
 ```bibtex
-@article{yang2025machine,
-  title={Machine Mental Imagery: Empower Multimodal Reasoning with Latent Visual Tokens}, 
-  author={Zeyuan Yang and Xueyang Yu and Delin Chen and Maohao Shen and Chuang Gan},
-  year={2025},
-  eprint={2506.17218},
-  archivePrefix={arXiv},
-  primaryClass={cs.CV},
-  url={https://arxiv.org/abs/2506.17218}, 
-}
+
 ```
 
 ## Acknowledgement
