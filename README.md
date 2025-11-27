@@ -169,7 +169,15 @@ We evalutate Monet-7B on [VLMEvalKit](https://github.com/open-compass/VLMEvalKit
 
 ## Citation
 ```bibtex
-
+@misc{wang2025monetreasoninglatentvisual,
+      title={Monet: Reasoning in Latent Visual Space Beyond Images and Language}, 
+      author={Qixun Wang and Yang Shi and Yifei Wang and Yuanxing Zhang and Pengfei Wan and Kun Gai and Xianghua Ying and Yisen Wang},
+      year={2025},
+      eprint={2511.21395},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2511.21395}, 
+}
 ```
 
 ## Acknowledgement
