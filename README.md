@@ -13,7 +13,7 @@
     <a href="https://yisenwang.github.io/">Yisen Wang</a>
   </p>
   <p align="center">
-    <a href="">
+    <a href="http://arxiv.org/abs/2511.21395">
       <img src='https://img.shields.io/badge/Paper-PDF-red?style=flat&logo=arXiv&logoColor=red' alt='Paper PDF'>
     </a>
     <a href="https://huggingface.co/NOVAglow646/Monet-7B" target="_blank" rel="noopener noreferrer">
