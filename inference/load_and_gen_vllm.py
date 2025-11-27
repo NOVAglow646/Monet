@@ -28,7 +28,6 @@ max_tokens = 4096
 swap_space = 7
 seed = 0
 stop = None
-
 max_pixels = 8192*28*28
 min_pixels = 256*28*28
 
