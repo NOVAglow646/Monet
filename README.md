@@ -168,6 +168,8 @@ We evalutate Monet-7B on [VLMEvalKit](https://github.com/open-compass/VLMEvalKit
 
 
 ## Citation
+If you find this work useful, please use the following BibTeX. Thank you for your support!
+
 ```bibtex
 @misc{wang2025monetreasoninglatentvisual,
       title={Monet: Reasoning in Latent Visual Space Beyond Images and Language}, 
