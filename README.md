@@ -58,7 +58,7 @@ We introduce <b>Monet</b>, a training framework that enables multimodal large la
       <a href="#citation">Citation</a>
     </li>
     <li>
-      <a href="#acknowledgement">Citation</a>
+      <a href="#acknowledgement">Acknowledgement</a>
     </li>
   </ol>
 </details>
