@@ -34,10 +34,10 @@
 We introduce <b>Monet</b>, a training framework that enables multimodal large language models (MLLMs) to reason directly within the latent visual space by generating continuous embeddings that function as intermediate visual thoughts. 
 <br>
 
-## Updates:
+## 🔥Updates:
 * 2025.12.02 Fix typos in script_examples/sft_stage1.sh, script_examples/sft_stage2.sh, script_examples/sft_stage3.sh
 
-## Overview
+## 🔍Overview
 <details open="open" style='padding: 10px; border-radius:5px 30px 30px 5px; border-style: solid; border-width: 1px;'>
   <summary>Tabel of Contents</summary>
   <ol>
@@ -73,7 +73,7 @@ To support latent reasoning, we use customized Qwen2.5-VL-7B model to replace th
 * [Modified vLLM model (for inference)](./inference/vllm/monet_gpu_model_runner.py)
 
 
-## Installation
+## ⚙Installation
 
 ```bash
 git clone https://github.com/NOVAglow646/Monet.git
@@ -95,12 +95,12 @@ conda activate easyr1
 pip install -r requirements.txt
 ```
 
-## Training Data
+## 📕Training Data
 * [SFT data (Monet-SFT-125K)](https://huggingface.co/datasets/NOVAglow646/Monet-SFT-125K/tree/main)
 * [RL data (Thyme-RL)](https://huggingface.co/datasets/Kwai-Keye/Thyme-RL)
 
 
-## SFT Training
+## 🔧SFT Training
 ### Training Scripts
 See [this folder](./script_examples).
 
@@ -109,7 +109,7 @@ The training requires a modification of the official code of Qwen2.5-VL-7B, whic
 
 
 
-## RL Training
+## 🚀RL Training
 We implement our RL training based on [EasyR1](https://github.com/hiyouga/EasyR1).
 
 ### Training Scripts
@@ -154,7 +154,7 @@ For RL training, we use external LLM APIs (Gemini / DeepSeek) via the helper in 
 Please refer to `RL/tools/custom_api.py` for the exact calling interface.
 
 
-## Inference
+## ⭐Inference
 ### Download Monet-7B Model
 You can download Monet-7B at [this repo](https://huggingface.co/NOVAglow646/Monet-7B). The inference requires replacing the official code of vLLM (see [Modified vLLM model](./monet_qwen_model/vllm/monet_gpu_model_runner.py)). 
 
@@ -169,7 +169,7 @@ See this [quick example](./inference/vllm_inference_example.py) to use Monet-7B 
 We evalutate Monet-7B on [VLMEvalKit](https://github.com/open-compass/VLMEvalKit). Notably, we replace the original exact matching judgement with API judge to ensure more accurate assessment.
 
 
-## Citation
+## 🖊Citation
 If you find this work useful, please use the following BibTeX. Thank you for your support!
 
 ```bibtex
@@ -184,7 +184,7 @@ If you find this work useful, please use the following BibTeX. Thank you for you
 }
 ```
 
-## Acknowledgement
+## 🙏Acknowledgement
 We sincerely thank the following great works as they provide valuable data or code for our work:
 * [Zebra-CoT](https://huggingface.co/datasets/multimodal-reasoning-lab/Zebra-CoT)
 * [Visual-CoT](https://huggingface.co/datasets/deepcs233/Visual-CoT)
