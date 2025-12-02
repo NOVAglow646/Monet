@@ -8,7 +8,7 @@ torchrun --nproc-per-node=8 --master-port=29505 -m src.precompute_teacher_reps \
   --bsz 1 \
   --data_path \
     "path_to_your_dataset/Monet-SFT-125K/Visual_CoT/train.json" \
-    "path_to_your_dataset/Monet-SFT-125K/CoM_w_MathVista/train.json" \
+    "path_to_your_dataset/Monet-SFT-125K/CogCoM/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/ReFocus/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_count/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_visual_search/train.json" \
@@ -37,7 +37,7 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
   --stage "sft_stage2" \
   --data_path \
     "path_to_your_dataset/Monet-SFT-125K/Visual_CoT/train.json" \
-    "path_to_your_dataset/Monet-SFT-125K/CoM_w_MathVista/train.json" \
+    "path_to_your_dataset/Monet-SFT-125K/CogCoM/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/ReFocus/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_count/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_visual_search/train.json" \

@@ -13,7 +13,7 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.precompute_teacher_latent
   --bsz 1 \
   --data_path \
     "path_to_your_dataset/Monet-SFT-125K/Visual_CoT/train.json" \
-    "path_to_your_dataset/Monet-SFT-125K/CoM_w_MathVista/train.json" \
+    "path_to_your_dataset/Monet-SFT-125K/CogCoM/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/ReFocus/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_count/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_visual_search/train.json" \
@@ -22,13 +22,14 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.precompute_teacher_latent
   --save_model_path path_to_your_model/Monet_checkpoints/monet_precomputed_target_latent/${TEACHER} \
   --dataset_root path_to_your_dataset \
   --deepspeed ./deepspeed/ds_zero2_gpu.json \
-  --latent_size ${LATENT_SIZE} \
+  --latent_size ${TEACHER_LATENT_SIZE} \
   --output_hidden_states \
   --resume
 
 
 
 # STEP 2: SFT stage3 training
+STAGE1_MODEL=sft_stage1_ce2.0
 LATENT_SIZE=8
 CE_EMPHASIZE_FACTOR=4.0
 ALIGNMENT_WEIGHT=2.0
@@ -41,7 +42,7 @@ torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
   --stage "avt_v5_stage2" \
   --data_path \
     "path_to_your_dataset/Monet-SFT-125K/Visual_CoT/train.json" \
-    "path_to_your_dataset/Monet-SFT-125K/CoM_w_MathVista/train.json" \
+    "path_to_your_dataset/Monet-SFT-125K/CogCoM/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/ReFocus/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_count/train.json" \
     "path_to_your_dataset/Monet-SFT-125K/Zebra_CoT_visual_search/train.json" \
