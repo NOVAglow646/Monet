@@ -76,8 +76,8 @@ python -m verl.trainer.main \
     worker.reward.repetition_penalty=true \
     worker.rule_based_judge.judge_function=./examples/reward_function/monet_reward_function.py:rule_then_api_batch_judge \
     worker.rule_based_judge.api_name="gemini-2.5-pro" \
-    worker.actor.monet_rl_sigma=${monet_RL_SIGMA} \
-    worker.ref.monet_rl_sigma=${monet_RL_SIGMA} \
+    worker.actor.monet_rl_sigma=${MONET_RL_SIGMA} \
+    worker.ref.monet_rl_sigma=${MONET_RL_SIGMA} \
     algorithm.kl_coef=${KL_COEF} \
     data.rollout_batch_size=${ORI_BSZ} \
     data.online_accum_size=${ONLINE_ACCUM_SIZE} \
