@@ -34,7 +34,7 @@
 We introduce <b>Monet</b>, a training framework that enables multimodal large language models (MLLMs) to reason directly within the latent visual space by generating continuous embeddings that function as intermediate visual thoughts. 
 <br>
 
-## 🔥Updates:
+## 🔥Updates
 * 2025.12.11 Update the prompt in ./inference/vllm_inference_example.py (add "Put your final answer in \\boxed{}.").
 * 2025.12.04 Fix typos in RL/examples/vlpo_train.sh
 * 2025.12.02 Fix typos in script_examples/sft_stage1.sh, script_examples/sft_stage2.sh, script_examples/sft_stage3.sh
