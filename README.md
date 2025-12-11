@@ -35,6 +35,7 @@ We introduce <b>Monet</b>, a training framework that enables multimodal large la
 <br>
 
 ## 🔥Updates:
+* 2025.12.11 Update the prompt in ./inference/vllm_inference_example.py (add "Put your final answer in \\boxed{}.").
 * 2025.12.04 Fix typos in RL/examples/vlpo_train.sh
 * 2025.12.02 Fix typos in script_examples/sft_stage1.sh, script_examples/sft_stage2.sh, script_examples/sft_stage3.sh
 
@@ -169,6 +170,12 @@ See this [quick example](./inference/vllm_inference_example.py) to use Monet-7B 
 ### Evaluation
 We evalutate Monet-7B on [VLMEvalKit](https://github.com/open-compass/VLMEvalKit). Notably, we replace the original exact matching judgement with API judge to ensure more accurate assessment.
 
+⚠**Note that:**
+
+To accurately reproduce the result:
+* Please use the following system prompt for VLMEvalKit evaluation:
+ `You are a helpful multimodal assistant. You are required to answer the question based on the image provided. Put your final answer in \\boxed{}.` 
+* Please apply an API model as a supplementary judge.
 
 ## 🖊Citation
 If you find this work useful, please use the following BibTeX. Thank you for your support!
