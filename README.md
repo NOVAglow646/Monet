@@ -137,10 +137,12 @@ For RL training, we use external LLM APIs (Gemini / DeepSeek) via the helper in 
 
 - **Gemini (Google AI)**
   - Install the SDK:
+    
     ```bash
     pip install google-genai
     ```
   - Set your API key (from Google AI Studio) before running RL scripts:
+    
     ```bash
     export GOOGLE_API_KEY="<your_gemini_api_key>"
     ```
@@ -148,10 +150,12 @@ For RL training, we use external LLM APIs (Gemini / DeepSeek) via the helper in 
 
 - **DeepSeek**
   - Install the OpenAI-compatible SDK:
+    
     ```bash
     pip install openai
     ```
   - Set the API key:
+    
     ```bash
     export DEEPSEEK_API_KEY="<your_deepseek_api_key>"
     ```
@@ -173,6 +177,43 @@ See this [quick example](./inference/vllm_inference_example.py) to use Monet-7B 
 
 ### Evaluation
 We evalutate Monet-7B on [VLMEvalKit](https://github.com/open-compass/VLMEvalKit). Notably, we replace the original exact matching judgement with API judge to ensure more accurate assessment.
+
+**How to apply Monet inference in VLMEvalKit:**
+
+- Make sure you use `vllm==0.10.0` for you evaluation environment.
+- Clone the VLMEvalKit repo: 
+  
+   ```bash
+   git clone https://github.com/open-compass/VLMEvalKit.git 
+   ```
+- Copy `monet_gpu_model_runner.py` to a sub-directory of the VLMEvalKit repo:
+  
+  ```bash
+    mkdir -p xxx/VLMEvalKit/Monet_models
+    cp xxx/Monet/inference/vllm/monet_gpu_model_runner.py xxx/VLMEvalKit/Monet_models
+    ```
+
+- In `xxx/VLMEvalKit/`, run the following script to create `sitecustomized.py` with the required content:
+
+  ```bash
+  cd xxx/VLMEvalKit/
+  cat > sitecustomized.py <<'PYCODE'
+  # sitecustomize.py (top-level)
+  # Runs in every Python process (parent + spawned workers)
+
+  import os, sys, importlib
+  os.environ["VLLM_USE_V1"] = "1"  # force V1 engine if desired
+  os.environ["VLLM_NO_USAGE_STATS"] = "1"  # disable usage stats
+  workspace = os.path.abspath(".")
+  old_path = os.environ.get("PYTHONPATH", "")
+  os.environ["PYTHONPATH"] = f"{workspace}:{old_path}" if old_path else workspace
+  os.environ["LATENT_START_ID"] = "151666"
+  os.environ["LATENT_END_ID"] = "151667"
+  sys.modules["vllm.v1.worker.gpu_model_runner"] = importlib.import_module("Monet_models.monet_gpu_model_runner")
+  PYCODE
+  ```
+  `sitecustomized.py` will overwrite the corresponding vLLM inference code (`vllm.v1.worker.gpu_model_runner`) with `monet_gpu_model_runner.py` when running codes under the VLMEvalKit directory so that Monet is fulfiled: the logic of `monet_gpu_model_runner.py` is that when model output the start token of latent reasoning (151666), the decoding will be switched to the latent mode.
+
 
 ⚠**Note that:**
 
