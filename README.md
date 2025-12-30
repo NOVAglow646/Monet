@@ -17,10 +17,13 @@
       <img src='https://img.shields.io/badge/Paper-PDF-red?style=flat&logo=arXiv&logoColor=red' alt='Paper PDF'>
     </a>
     <a href="https://huggingface.co/NOVAglow646/Monet-7B" target="_blank" rel="noopener noreferrer">
-      <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Model-Monet7B-ffc107?color=ffc107&logoColor=white" height="20" />
+      <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Model-Monet_7B-ffc107?color=ffc107&logoColor=white" height="20" />
+    </a>
+    <a href="https://huggingface.co/NOVAglow646/Monet-SFT-7B" target="_blank" rel="noopener noreferrer">
+      <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Model-Monet_SFT-ffc107?color=ffc107&logoColor=white" height="20" />
     </a>
     <a href="https://huggingface.co/datasets/NOVAglow646/Monet-SFT-125K" target="_blank">
-    <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Data-MonetSFT125K-ffc107?color=ffc107&logoColor=white" height="20" />
+    <img alt="HF Model: ViGaL" src="https://img.shields.io/badge/%F0%9F%A4%97%20_Data-Monet_SFT_125K-ffc107?color=ffc107&logoColor=white" height="20" />
     </a>
 
   </p>
@@ -35,6 +38,7 @@ We introduce <b>Monet</b>, a training framework that enables multimodal large la
 <br>
 
 ## 🔥Updates
+* 2025.12.30 Upload the models of SFT stage 1/2/3.
 * 2025.12.11 Update the prompt in ./inference/vllm_inference_example.py (add "Put your final answer in \\boxed{}.").
 * 2025.12.04 Fix typos in RL/examples/vlpo_train.sh
 * 2025.12.02 Fix typos in script_examples/sft_stage1.sh, script_examples/sft_stage2.sh, script_examples/sft_stage3.sh
