@@ -36,7 +36,7 @@ conda easyr1
 cd Monet/RL
 
 MONET_RL_PATCH=1 # overwrite the transformers and vllm forward module
-MODEL_PATH=path_to_your_model/Monet-7B
+MODEL_PATH=path_to_your_model/Monet_SFT_stage3_model # path to your Monet SFT stage3 model
 latent_size=10
 export LATENT_SIZE=${latent_size}
 ROLLOUT_N=8

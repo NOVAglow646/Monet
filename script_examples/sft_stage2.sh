@@ -31,7 +31,7 @@ ALIGNMENT_WEIGHT=2.0
 EMPHASIZE_LATENT_WEIGHT=2.0
 SAVE_CKPT=sft_stage2_latent${LATENT_SIZE}_ce${CE_EMPHASIZE_FACTOR}_al${ALIGNMENT_WEIGHT}_emph${EMPHASIZE_LATENT_WEIGHT}
 torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
-  --epochs 4 \
+  --epochs 2 \
   --bsz 1 \
   --grad_accum_steps 16 \
   --stage "sft_stage2" \

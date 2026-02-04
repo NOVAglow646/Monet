@@ -36,7 +36,7 @@ ALIGNMENT_WEIGHT=2.0
 EMPHASIZE_LATENT_WEIGHT=2.0
 SAVE_CKPT=sft_stage3_target-latent${TEACHER_LATENT_SIZE}-al${TEACHER_ALIGN_WEIGHT}-emph${TEACHER_EMPHASIZE_LATENT_WEIGHT}_student-latent${LATENT_SIZE}-ce${CE_EMPHASIZE_FACTOR}-al${ALIGNMENT_WEIGHT}-emph${EMPHASIZE_LATENT_WEIGHT}
 torchrun --nproc-per-node=8 --master-port=29501 -m src.main \
-  --epochs 3 \
+  --epochs 2 \
   --bsz 1 \
   --grad_accum_steps 16 \
   --stage "avt_v5_stage2" \
