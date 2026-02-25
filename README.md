@@ -38,10 +38,11 @@ We introduce <b>Monet</b>, a training framework that enables multimodal large la
 <br>
 
 ## 🔥Updates
-* 2025.12.30 Upload the models of SFT stage 1/2/3.
-* 2025.12.11 Update the prompt in ./inference/vllm_inference_example.py (add "Put your final answer in \\boxed{}.").
-* 2025.12.04 Fix typos in RL/examples/vlpo_train.sh
-* 2025.12.02 Fix typos in script_examples/sft_stage1.sh, script_examples/sft_stage2.sh, script_examples/sft_stage3.sh
+* **2026.02.21** **Monet has been accepted by CVPR 2026!**
+* **2025.12.30** Upload the models of SFT stage 1/2/3.
+* **2025.12.11** Update the prompt in ./inference/vllm_inference_example.py (add "Put your final answer in \\boxed{}.").
+* **2025.12.04** Fix typos in RL/examples/vlpo_train.sh
+* **2025.12.02** Fix typos in script_examples/sft_stage1.sh, script_examples/sft_stage2.sh, script_examples/sft_stage3.sh
 
 ## 🔍Overview
 <details open="open" style='padding: 10px; border-radius:5px 30px 30px 5px; border-style: solid; border-width: 1px;'>
