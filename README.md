@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">Monet: Reasoning in Latent Visual Space Beyond Images and Language</h1>
+  <h1 align="center">[CVPR 2026] Monet: Reasoning in Latent Visual Space Beyond Images and Language</h1>
   <p align="center">
   </p>
   <p align="center">
