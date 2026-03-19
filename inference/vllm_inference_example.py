@@ -14,7 +14,6 @@ def main():
     
     mllm, sampling_params = vllm_mllm_init(model_path, tp=1, gpu_memory_utilization=0.8)
     processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-    os.environ['LATENT_SIZE'] = '10'
 
     conversations = [
         [

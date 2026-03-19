@@ -38,6 +38,7 @@ We introduce <b>Monet</b>, a training framework that enables multimodal large la
 <br>
 
 ## 🔥Updates
+* **2026.3.19** Update `inference/example.sh`: add `export LATENT_SIZE=10`; update `vllm_inference_example.py`: remove the unused `os.environ['LATENT_SIZE'] = '10'`.
 * **2026.02.21** **Monet has been accepted by CVPR 2026!🎉**
 * **2025.12.30** Upload the models of SFT stage 1/2/3.
 * **2025.12.11** Update the prompt in ./inference/vllm_inference_example.py (add "Put your final answer in \\boxed{}.").
@@ -227,14 +228,11 @@ To accurately reproduce the result:
 If you find this work useful, please use the following BibTeX. Thank you for your support!
 
 ```bibtex
-@misc{wang2025monetreasoninglatentvisual,
+@inproceedings{wang2025monetreasoninglatentvisual,
       title={Monet: Reasoning in Latent Visual Space Beyond Images and Language}, 
       author={Qixun Wang and Yang Shi and Yifei Wang and Yuanxing Zhang and Pengfei Wan and Kun Gai and Xianghua Ying and Yisen Wang},
-      year={2025},
-      eprint={2511.21395},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2511.21395}, 
+      year={2026},
+      booktitle={CVPR}
 }
 ```
 
